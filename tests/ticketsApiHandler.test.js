@@ -1259,6 +1259,115 @@ describe("tickets API handler", () => {
     }));
   });
 
+  it("treats a repeated admin delete as an idempotent success", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue(null),
+      delete: vi.fn()
+    };
+    const auditDriver = { write: vi.fn() };
+    const handler = createTicketsApiHandler({
+      driver,
+      auditDriver,
+      sessionClient: sessionClientFor({ id: "admin-1", role: "admin", permissions: { tickets: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "DELETE",
+      headers: { authorization: "Bearer user-token" },
+      query: { id: "T-already-deleted" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      ok: true,
+      ticket: { id: "T-already-deleted" },
+      cleanup: { files: 0, metadata: false, errors: 0 },
+      alreadyDeleted: true
+    });
+    expect(driver.delete).not.toHaveBeenCalled();
+    expect(auditDriver.write).not.toHaveBeenCalled();
+  });
+
+  it("does not turn a missing ticket into delete access for non-admin roles", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue(null),
+      delete: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ id: "worker-1", role: "worker" })
+    });
+
+    const res = await call(handler, {
+      method: "DELETE",
+      headers: { authorization: "Bearer worker-token" },
+      query: { id: "T-missing" }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:tickets:delete" });
+    expect(driver.delete).not.toHaveBeenCalled();
+  });
+
+  it("keeps optional file cleanup failures visible without reporting ticket deletion failure", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue(ticketRecord({ id: "F-cleanup" })),
+      delete: vi.fn().mockResolvedValue(undefined)
+    };
+    const metadataDriver = {
+      listActiveByOwner: vi.fn().mockResolvedValue([{ path: "tickets/F-cleanup/before.jpg" }]),
+      markDeletedByOwner: vi.fn().mockRejectedValue(new Error("metadata unavailable"))
+    };
+    const fileDriver = { delete: vi.fn().mockRejectedValue(new Error("storage unavailable")) };
+    const handler = createTicketsApiHandler({
+      driver,
+      metadataDriver,
+      fileDriver,
+      sessionClient: sessionClientFor({ id: "admin-1", role: "admin", permissions: { tickets: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "DELETE",
+      headers: { authorization: "Bearer user-token" },
+      query: { id: "F-cleanup" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      ok: true,
+      ticket: { id: "F-cleanup" },
+      cleanup: { files: 0, metadata: false, errors: 2 }
+    });
+    expect(driver.delete).toHaveBeenCalledWith("F-cleanup");
+  });
+
+  it("reports a mandatory backend delete failure and skips secondary cleanup", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue(ticketRecord({ id: "T-delete-fails" })),
+      delete: vi.fn().mockRejectedValue(new Error("database unavailable"))
+    };
+    const metadataDriver = {
+      listActiveByOwner: vi.fn(),
+      markDeletedByOwner: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      metadataDriver,
+      sessionClient: sessionClientFor({ id: "admin-1", role: "admin", permissions: { tickets: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "DELETE",
+      headers: { authorization: "Bearer user-token" },
+      query: { id: "T-delete-fails" }
+    });
+
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toMatchObject({ error: "tickets_api_error" });
+    expect(metadataDriver.listActiveByOwner).not.toHaveBeenCalled();
+    expect(metadataDriver.markDeletedByOwner).not.toHaveBeenCalled();
+  });
+
   it("cleans ticket-owned files when deleting a normalized ticket", async () => {
     const driver = {
       get: vi.fn().mockResolvedValue(ticketRecord({ id: "T-5" })),

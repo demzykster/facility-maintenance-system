@@ -12,6 +12,12 @@ const errorResponse = (status, body = {}) => ({
   text: () => Promise.resolve(JSON.stringify(body))
 });
 
+const noContentResponse = () => ({
+  ok: true,
+  status: 204,
+  text: () => Promise.resolve("")
+});
+
 describe("api ticket adapter", () => {
   it("reads normalized tickets through the production bearer token", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(okResponse({ ok: true, tickets: [{ id: "T-1" }] }));
@@ -121,6 +127,24 @@ describe("api ticket adapter", () => {
         authorization: "Bearer access-1"
       }
     });
+  });
+
+  it("accepts a 204 no-content delete response", async () => {
+    const provider = createApiTicketProvider({
+      baseUrl: "https://cmms.example/api",
+      fetchImpl: vi.fn().mockResolvedValue(noContentResponse())
+    });
+
+    await expect(provider.delete("T-204")).resolves.toBe(true);
+  });
+
+  it("surfaces a real delete error", async () => {
+    const provider = createApiTicketProvider({
+      baseUrl: "https://cmms.example/api",
+      fetchImpl: vi.fn().mockResolvedValue(errorResponse(500, { error: "tickets_api_error" }))
+    });
+
+    await expect(provider.delete("T-500")).rejects.toThrow("tickets_api_error");
   });
 
   it("stays disabled when no API base URL is configured", () => {

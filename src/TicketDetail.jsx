@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { closedTicketRecord } from "./ticketClosureModel.js";
+import { deleteTicketAndClose } from "./ticketDeletionModel.js";
 import { ticketResponsibleLabel, transportTicketSupplierName as transportTicketSupplierNameModel } from "./ticketResponsibilityModel.js";
 import {
   buildTicketWaitingTargetPatch,
@@ -535,7 +536,7 @@ export function TicketDetail(p) {
 
       {mine && ticket.status === "new" && <ConfirmBtn className="btn-danger full" style={{ marginTop: 16 }} icon={null} label="ביטול הקריאה" onConfirm={cancelOwn} />}
 
-      {role === "admin" && <ConfirmBtn className="btn-danger full" style={{ marginTop: 16 }} icon={<Trash2 size={15} />} label="מחיקת הקריאה לצמיתות" onConfirm={() => { onBack(); if (p.delTicket) p.delTicket(ticket.id); }} />}
+      {role === "admin" && <ConfirmBtn className="btn-danger full" style={{ marginTop: 16 }} icon={<Trash2 size={15} />} label="מחיקת הקריאה לצמיתות" onConfirm={() => deleteTicketAndClose({ ticketId: ticket.id, deleteTicket: p.delTicket, onBack })} />}
 
       <SectionTitle>היסטוריית טיפול</SectionTitle>
       <div className="timeline">{[...(ticket.log || [])].reverse().map((l, i) => <div className="tl-item" key={i}><div className="tl-dot" /><div className="tl-body"><div className="tl-text">{l.text}</div><div className="tl-meta">{l.by} · {fmtDate(l.at)} {fmtTime(l.at)}</div></div></div>)}</div>

@@ -206,7 +206,15 @@ export function createTicketsApiHandler({ driver = null, auditDriver = null, met
         if (typeof backendDriver.get !== "function") return json(res, 503, { error: "tickets_read_not_configured" });
         if (typeof backendDriver.delete !== "function") return json(res, 503, { error: "tickets_delete_not_configured" });
         const existing = await backendDriver.get(id);
-        if (!existing) return json(res, 404, { error: "ticket_not_found" });
+        if (!existing) {
+          if (auth.user.role !== "admin") return json(res, 403, { error: "permission_required:tickets:delete" });
+          return json(res, 200, {
+            ok: true,
+            ticket: { id },
+            cleanup: { files: 0, metadata: false, errors: 0 },
+            alreadyDeleted: true
+          });
+        }
         const scopePermissionError = await ticketWritePermissionError(auth.user, existing, { fleetDriver: backendFleetDriver, action: "delete" });
         if (scopePermissionError) return json(res, 403, { error: scopePermissionError });
         await backendDriver.delete(id);

@@ -3032,7 +3032,7 @@ export default function App() {
       if (!await deleteShared(`ticket:${id}`)) return false;
       void shadowDeleteNormalizedTicket(id);
     }
-    try { await TICKET_PHOTOS.remove(tickets.find((x) => x.id === id) || id); } catch {}
+    if (!NORMALIZED_TICKET_AUTHORITY) try { await TICKET_PHOTOS.remove(tickets.find((x) => x.id === id) || id); } catch {}
     setTickets((s) => s.filter((x) => x.id !== id));
     return true;
   };
