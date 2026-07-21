@@ -1251,6 +1251,24 @@ describe("AI assist action model", () => {
     })).toEqual([]);
   });
 
+  it("does not confuse a waiting supplier target with execution supplier routing", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "תעדכן את הקריאה לממתינה לספק Toyota",
+      actor,
+      language: "he"
+    }, 1000);
+
+    expect(buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      context: {
+        profile: { capabilities: { supplierRouting: true } },
+        tickets: [{ id: "T-1", subject: "תקלה במזגן", track: "facility", status: "in_progress", supplier: "Execution Co" }],
+        suppliers: [{ name: "Toyota", type: "transport", scopes: ["transport"] }]
+      }
+    })).toEqual([]);
+  });
+
   it("clears waiting reason fields when moving a waiting ticket back to work", () => {
     const draft = buildAiIntakeDraft({
       rawText: "תעדכן את הקריאה לסטטוס בטיפול",
@@ -1262,7 +1280,15 @@ describe("AI assist action model", () => {
       draft,
       user: actor,
       context: {
-        tickets: [{ id: "T-1", subject: "תקלה במלגזה", status: "waiting", waitingReason: "parts", waitBall: "executor" }]
+        tickets: [{
+          id: "T-1",
+          subject: "תקלה במלגזה",
+          status: "waiting",
+          waitingReason: "parts",
+          waitBall: "executor",
+          waitingTargetType: "supplier",
+          waitingSupplier: "Old Target"
+        }]
       }
     });
 
@@ -1271,8 +1297,24 @@ describe("AI assist action model", () => {
         payload: {
           ticketId: "T-1",
           ticketTitle: "תקלה במלגזה",
-          current: { status: "waiting", waitingReason: "parts", waitBall: "executor" },
-          patch: { status: "in_progress", waitingReason: null, waitBall: null }
+          current: {
+            status: "waiting",
+            waitingReason: "parts",
+            waitBall: "executor",
+            waitingTargetType: "supplier",
+            waitingSupplier: "Old Target",
+            waitingUser: "",
+            waitingUntil: ""
+          },
+          patch: {
+            status: "in_progress",
+            waitingReason: null,
+            waitBall: null,
+            waitingTargetType: "none",
+            waitingSupplier: null,
+            waitingUser: null,
+            waitingUntil: null
+          }
         }
       })
     ]);

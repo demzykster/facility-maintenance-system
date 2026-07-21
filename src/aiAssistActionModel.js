@@ -1,3 +1,5 @@
+import { waitingTargetRequirementForReason } from "./ticketWaitingTargetModel.js";
+
 const MAX_SUBJECT_CHARS = 80;
 const MAX_DESCRIPTION_CHARS = 1200;
 const HOUR = 3600000;
@@ -514,7 +516,7 @@ function buildAiTicketUpdateProposal({ draft = {}, context = {} } = {}) {
   const requestedStatus = requestedTicketStatusFromText(draft.rawText);
   if (requestedStatus === "waiting") {
     const requestedWaitingReason = requestedWaitingReasonFromText(draft.rawText);
-    if (requestedWaitingReason) {
+    if (requestedWaitingReason && !waitingTargetRequirementForReason(requestedWaitingReason).required) {
       if (ticket.status !== "waiting") patch.status = "waiting";
       if (requestedWaitingReason !== ticket.waitingReason) patch.waitingReason = requestedWaitingReason;
       const waitBall = WAITING_REASON_BALLS[requestedWaitingReason] || "executor";
@@ -525,9 +527,15 @@ function buildAiTicketUpdateProposal({ draft = {}, context = {} } = {}) {
     if (ticket.status === "waiting") {
       patch.waitingReason = null;
       patch.waitBall = null;
+      patch.waitingTargetType = "none";
+      patch.waitingSupplier = null;
+      patch.waitingUser = null;
+      patch.waitingUntil = null;
     }
   }
-  const requestedSupplier = canProposeSupplierRouting(context) ? requestedSupplierFromText(draft.rawText, context.suppliers) : "";
+  const requestedSupplier = !hasWaitingStatusIntent(draft.rawText) && canProposeSupplierRouting(context)
+    ? requestedSupplierFromText(draft.rawText, context.suppliers)
+    : "";
   if (requestedSupplier && requestedSupplier !== ticket.supplier) patch.supplier = requestedSupplier;
   const requestedZone = requestedZoneFromText(draft.rawText);
   if (requestedZone && requestedZone !== ticket.zone) patch.zone = requestedZone;

@@ -118,7 +118,7 @@ function renderTicket(track, options = {}) {
     ticket: smokeTicket(track, options.ticket || {}),
     tickets: [],
     fleet: [{ id: "fleet-1", code: "194340", supplier: "טויוטה" }],
-    users: [],
+    users: options.users || [],
     config: options.config || {},
     session: options.session || { id: "admin-1", name: "Vadim", role: "admin" },
     saveTicket: () => true,
@@ -333,10 +333,42 @@ describe("ticket detail render smoke", () => {
       ui: { supplierCandidatesForTicket }
     });
 
-    expect(html).toContain("ספק שממתינים לו");
+    expect(html).toContain("בחר ספק שממתינים לו");
     expect(html).toContain("Building Co");
     expect(html).not.toContain(">Toyota<");
     expect(html).not.toContain("שיוך ספק / קבלן");
+  });
+
+  it("shows the requester target without replacing the pending_user approval flow", () => {
+    const html = renderTicket("facility", {
+      ticket: {
+        status: "waiting",
+        waitingReason: "requester_confirmation",
+        createdBy: null,
+        reportedBy: null,
+        requesterId: "legacy-requester",
+        requesterName: "Legacy Requester"
+      }
+    });
+
+    expect(html).toContain("ממתינים לאישור הפותח");
+    expect(html).toContain("Legacy Requester");
+    expect(html).not.toContain("אישור ביצוע");
+  });
+
+  it("shows an explicit manager selector and scheduled return date field", () => {
+    const managerHtml = renderTicket("facility", {
+      ticket: { status: "waiting", waitingReason: "manager_decision" },
+      users: [{ id: "manager-1", name: "Manager One", role: "user", active: true }]
+    });
+    const dateHtml = renderTicket("facility", {
+      ticket: { status: "waiting", waitingReason: "scheduled_date" }
+    });
+
+    expect(managerHtml).toContain("בחר מנהל שממתינים להחלטתו");
+    expect(managerHtml).toContain("Manager One");
+    expect(dateHtml).toContain("תאריך חזרה לטיפול");
+    expect(dateHtml).toContain('type="datetime-local"');
   });
 
   it("keeps facility supplier routing available during initial report approval", () => {

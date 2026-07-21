@@ -1,3 +1,5 @@
+import { waitingTargetRequirementForReason } from "./ticketWaitingTargetModel.js";
+
 const cleanText = (value, limit = 240) => String(value || "")
   .replace(/\s+/g, " ")
   .trim()
@@ -9,6 +11,10 @@ const AI_TICKET_UPDATE_ALLOWED_FIELDS = Object.freeze([
   "status",
   "waitingReason",
   "waitBall",
+  "waitingTargetType",
+  "waitingSupplier",
+  "waitingUser",
+  "waitingUntil",
   "assignee",
   "supplier",
   "description",
@@ -28,6 +34,12 @@ const AI_TASK_UPDATE_ALLOWED_FIELDS = Object.freeze([
 ]);
 const AI_MEETING_UPDATE_ALLOWED_FIELDS = Object.freeze([
   "at"
+]);
+const AI_WAITING_TARGET_CLEAR_FIELDS = Object.freeze([
+  "waitingTargetType",
+  "waitingSupplier",
+  "waitingUser",
+  "waitingUntil"
 ]);
 
 const normalizeComparable = (value) => value == null ? "" : value;
@@ -126,6 +138,15 @@ export function canExecuteAiAssistAction(action = {}) {
   if (!hasTicketsApiExecuteContract(action)) return false;
   if (action.type === "ticket.create") return !!cleanText(payload.priority, 40);
   if (action.type === "ticket.update") {
+    const patch = cleanObject(payload.patch);
+    if (Object.prototype.hasOwnProperty.call(patch, "waitingReason")
+      && waitingTargetRequirementForReason(patch.waitingReason).required) return false;
+    const writesWaitingTarget = AI_WAITING_TARGET_CLEAR_FIELDS.some((field) => {
+      if (!Object.prototype.hasOwnProperty.call(patch, field)) return false;
+      if (field === "waitingTargetType") return ![null, "", "none"].includes(patch[field]);
+      return patch[field] !== null && patch[field] !== "";
+    });
+    if (writesWaitingTarget) return false;
     return !!cleanText(payload.ticketId, 160)
       && !!payload.patch
       && typeof payload.patch === "object"
@@ -486,7 +507,10 @@ export function prepareAiTicketUpdateForSave(action = {}, existingTicket = {}, a
     if (!Object.prototype.hasOwnProperty.call(patch, field)) continue;
     const before = normalizeComparable(existingTicket[field]);
     const after = normalizeComparable(patch[field]);
-    if (before === after) continue;
+    const materializesWaitingTargetClear = AI_WAITING_TARGET_CLEAR_FIELDS.includes(field)
+      && patch[field] === null
+      && !Object.prototype.hasOwnProperty.call(existingTicket, field);
+    if (before === after && !materializesWaitingTargetClear) continue;
     nextPatch[field] = patch[field];
     changes.push({ field, before, after });
   }

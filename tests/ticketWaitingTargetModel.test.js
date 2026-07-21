@@ -4,6 +4,7 @@ import {
   buildTicketWaitingTargetPatch,
   getTicketWaitingTargetState,
   readTicketWaitingTarget,
+  ticketRequesterWaitingTarget,
   ticketWaitingTargetDraft,
   validateTicketWaitingTargetDraft,
   waitingTargetRequirementForReason
@@ -72,6 +73,18 @@ describe("ticket waiting target model", () => {
       complete: true,
       user: { id: "manager-1", name: "Manager" }
     });
+  });
+
+  it("normalizes requester targets from current and legacy ticket shapes without persisting them", () => {
+    expect(ticketRequesterWaitingTarget({
+      createdBy: { id: "requester-1", name: "Requester" }
+    })).toEqual({ id: "requester-1", name: "Requester" });
+    expect(ticketRequesterWaitingTarget({
+      requesterId: "legacy-1",
+      requesterName: "Legacy Requester"
+    })).toEqual({ id: "legacy-1", name: "Legacy Requester" });
+    expect(ticketRequesterWaitingTarget({ openedBy: "Opened By" })).toEqual({ id: "", name: "Opened By" });
+    expect(ticketRequesterWaitingTarget({})).toBeNull();
   });
 
   it("normalizes an explicit scheduled date target", () => {

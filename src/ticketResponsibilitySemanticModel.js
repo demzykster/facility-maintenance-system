@@ -2,15 +2,12 @@ import {
   ticketTrack,
   transportTechnicianAssignee
 } from "./ticketResponsibilityModel.js";
-import { getTicketWaitingTargetState } from "./ticketWaitingTargetModel.js";
+import {
+  getTicketWaitingTargetState,
+  ticketRequesterWaitingTarget
+} from "./ticketWaitingTargetModel.js";
 
 const text = (value) => String(value == null ? "" : value).trim();
-
-const requesterTarget = (ticket = {}) => {
-  const id = text(ticket.createdBy?.id || ticket.reportedBy?.id || ticket.requesterId);
-  const name = text(ticket.createdBy?.name || ticket.reportedBy?.name || ticket.requesterName || ticket.openedBy);
-  return id || name ? { id, name } : null;
-};
 
 export function getTicketResponsibleUser(ticket = {}, { fleet = [] } = {}) {
   const track = ticketTrack(ticket);
@@ -68,7 +65,7 @@ export function getTicketWaitingContext(ticket = {}, {
   waitReasonMeta = () => ({})
 } = {}) {
   if (ticket.status === "pending_user") {
-    const target = requesterTarget(ticket);
+    const target = ticketRequesterWaitingTarget(ticket);
     return {
       isWaiting: true,
       status: "pending_user",

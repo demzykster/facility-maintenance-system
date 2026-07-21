@@ -4,6 +4,7 @@ import { ticketResponsibleLabel, transportTicketSupplierName as transportTicketS
 import {
   buildTicketWaitingTargetPatch,
   readTicketWaitingTarget,
+  ticketRequesterWaitingTarget,
   ticketWaitingTargetDraft,
   validateTicketWaitingTargetDraft,
   waitingTargetRequirementForReason
@@ -199,7 +200,7 @@ function waitingDraftForReason(ticket, reason, session) {
     waitingUntil: ""
   };
   if (reason === "requester_confirmation") {
-    draft.waitingUser = ticket.createdBy || ticket.reportedBy || null;
+    draft.waitingUser = ticketRequesterWaitingTarget(ticket);
   } else if (reason === "manager_decision" && !draft.waitingUser && session?.role === "user") {
     draft.waitingUser = { id: session.id || "", name: session.name || "" };
   }
@@ -210,16 +211,16 @@ function WaitingTargetEditor({ draft, onChange, suppliers = [], managers = [], t
   const requirement = waitingTargetRequirementForReason(draft?.reason);
   if (!requirement.required) return null;
   if (requirement.type === "supplier") {
-    return <label className="field" style={{ marginTop: 10 }}><span>ספק שממתינים לו *</span><select className="ta" value={draft.waitingSupplier || ""} onChange={(event) => onChange({ ...draft, waitingSupplier: event.target.value })}><option value="">— בחירת ספק —</option>{suppliers.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>;
+    return <label className="field" style={{ marginTop: 10 }}><span>בחר ספק שממתינים לו *</span><select className="ta" value={draft.waitingSupplier || ""} onChange={(event) => onChange({ ...draft, waitingSupplier: event.target.value })}><option value="">— בחירת ספק —</option>{suppliers.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>;
   }
   if (requirement.type === "date") {
-    return <label className="field" style={{ marginTop: 10 }}><span>מועד חזרה לקריאה *</span><input type="datetime-local" value={draft.waitingUntil || ""} onChange={(event) => onChange({ ...draft, waitingUntil: event.target.value })} /></label>;
+    return <label className="field" style={{ marginTop: 10 }}><span>תאריך חזרה לטיפול *</span><input type="datetime-local" value={draft.waitingUntil || ""} onChange={(event) => onChange({ ...draft, waitingUntil: event.target.value })} /></label>;
   }
   if (requirement.type === "user") {
-    const requester = draft.waitingUser || ticket.createdBy || ticket.reportedBy;
-    return <div className="hint" style={{ marginTop: 10 }}>ממתינים לאישור: <b>{requester?.name || "פותח הקריאה"}</b></div>;
+    const requester = draft.waitingUser || ticketRequesterWaitingTarget(ticket);
+    return <div className="hint" style={{ marginTop: 10 }}>ממתינים לאישור הפותח: <b>{requester?.name || "פותח הקריאה"}</b></div>;
   }
-  return <label className="field" style={{ marginTop: 10 }}><span>מנהל שממתינים להחלטתו *</span><select className="ta" value={draft.waitingUser?.id || draft.waitingUser?.name || ""} onChange={(event) => { const manager = managers.find((user) => (user.id || user.name) === event.target.value); onChange({ ...draft, waitingUser: manager ? { id: manager.id || "", name: manager.name || "" } : null }); }}><option value="">— בחירת מנהל —</option>{managers.map((manager) => <option key={manager.id || manager.name} value={manager.id || manager.name}>{manager.name}</option>)}</select></label>;
+  return <label className="field" style={{ marginTop: 10 }}><span>בחר מנהל שממתינים להחלטתו *</span><select className="ta" value={draft.waitingUser?.id || draft.waitingUser?.name || ""} onChange={(event) => { const manager = managers.find((user) => (user.id || user.name) === event.target.value); onChange({ ...draft, waitingUser: manager ? { id: manager.id || "", name: manager.name || "" } : null }); }}><option value="">— בחירת מנהל —</option>{managers.map((manager) => <option key={manager.id || manager.name} value={manager.id || manager.name}>{manager.name}</option>)}</select></label>;
 }
 
 export function TicketDetail(p) {
@@ -249,17 +250,17 @@ export function TicketDetail(p) {
     const statusTransitionAt = pauseAt || now;
     onUpdate({ ...ticket, ...patch, ...pausePatch(ticket, patch, config, statusTransitionAt), statusTransitionAt, updatedAt: now, log: [...(ticket.log || []), e(text, kind)] });
   };
+  const clearWaitingTargetPatch = () => buildTicketWaitingTargetPatch("", {});
   const take = (pivotTs) => {
     // Если заявка ждала получения техники — точка разворота: ожидание транспорта кончается ТУТ и ремонт возобновляется ОТСЮДА.
     const wasWaitingEquip = ticket.status === "waiting" && ticket.waitingReason === "no_equipment" && ticket.equipWaitSince;
     const pivot = wasWaitingEquip && pivotTs ? Math.min(Date.now(), Math.max(ticket.equipWaitSince, pivotTs)) : Date.now();
     const addWait = wasWaitingEquip ? (pivot - ticket.equipWaitSince) : 0;
     const backNote = (wasWaitingEquip && pivotTs && Math.abs(Date.now() - pivotTs) > 60000) ? ` · התקבל ב-${fmtDate(pivot)} ${fmtTime(pivot)}` : "";
-    upd({ assignee: session.name, status: "in_progress", waitingReason: null, equipWaitSince: null, equipWaitMs: (ticket.equipWaitMs || 0) + addWait }, wasWaitingEquip ? `הכלי התקבל — הטכנאי קיבל לטיפול (המתנה לכלי: ${fmtDur(addWait)})${backNote}` : "הטכנאי קיבל את הקריאה לטיפול", "accept", pivot);
+    upd({ assignee: session.name, status: "in_progress", waitingReason: null, waitBall: null, ...clearWaitingTargetPatch(), equipWaitSince: null, equipWaitMs: (ticket.equipWaitMs || 0) + addWait }, wasWaitingEquip ? `הכלי התקבל — הטכנאי קיבל לטיפול (המתנה לכלי: ${fmtDur(addWait)})${backNote}` : "הטכנאי קיבל את הקריאה לטיפול", "accept", pivot);
   };
-  const noEquipment = () => upd({ status: "waiting", waitingReason: "no_equipment", waitBall: "manager", assignee: ticket.assignee || session.name, equipWaitSince: Date.now() }, "הטכנאי דיווח: הכלי לא התקבל — ממתין לקבלת הכלי מהמנהל", "waiting");
-  const clearWaitingTargetPatch = () => buildTicketWaitingTargetPatch("", {});
-  const setStatus = (ns) => upd(ns === "waiting" ? { status: ns } : { status: ns, waitingReason: null, ...clearWaitingTargetPatch() }, `סטטוס: ${stOf(ns).label}`);
+  const noEquipment = () => upd({ status: "waiting", waitingReason: "no_equipment", waitBall: "manager", ...clearWaitingTargetPatch(), assignee: ticket.assignee || session.name, equipWaitSince: Date.now() }, "הטכנאי דיווח: הכלי לא התקבל — ממתין לקבלת הכלי מהמנהל", "waiting");
+  const setStatus = (ns) => upd(ns === "waiting" ? { status: ns } : { status: ns, waitingReason: null, waitBall: null, ...clearWaitingTargetPatch() }, `סטטוס: ${stOf(ns).label}`);
   const setWaiting = (reason, targetDraft = {}) => {
     const targetPatch = buildTicketWaitingTargetPatch(reason, targetDraft);
     const waitingPatch = { status: "waiting", waitingReason: reason, waitBall: reasonBall(config, reason), ...targetPatch };
@@ -272,13 +273,13 @@ export function TicketDetail(p) {
     else setWaitingDraft(draft);
   };
   const setWear = (wt) => upd({ wearType: wt }, `סיווג: ${WEAR.find((x) => x.id === wt).label}`, "classify");
-  const finishTech = async () => { let photoPatch = {}; if (afterPhoto && !ticket.hasAfterPhoto) { try { photoPatch = await TICKET_PHOTOS.save(ticket.id, "after", afterPhoto); } catch (e) {} } upd({ status: "pending_user", hasAfterPhoto: !!afterPhoto || !!ticket.hasAfterPhoto, ...photoPatch }, "הטיפול הסתיים — הועבר לאישור הפותח" + (afterPhoto ? " (צורפה תמונת ביצוע)" : ""), "treat"); };
-  const takeMgr = () => upd({ status: "in_progress", waitingReason: null, ...clearWaitingTargetPatch() }, "המנהל קיבל את הקריאה לטיפול", "accept");
-  const finishMgr = async () => { let photoPatch = {}; if (afterPhoto && !ticket.hasAfterPhoto) { try { photoPatch = await TICKET_PHOTOS.save(ticket.id, "after", afterPhoto); } catch (e) {} } upd({ status: "pending_admin", hasAfterPhoto: !!afterPhoto || !!ticket.hasAfterPhoto, ...photoPatch }, "הטיפול הסתיים ע״י המנהל — הועבר לסגירת מנהל מערכת" + (afterPhoto ? " (צורפה תמונת ביצוע)" : ""), "treat"); };
-  const confirmUser = () => upd({ status: "pending_admin" }, "הפותח אישר שהתקלה טופלה", "approve");
-  const remarksUser = () => { if (!note.trim()) return; onUpdate({ ...ticket, status: "in_progress", returned: true, returnReason: note.trim(), updatedAt: Date.now(), log: [...(ticket.log || []), e(`⤺ הוחזר לטיפול — הבעיה לא נפתרה: ${note.trim()}`, "reopen")] }); setNote(""); setReturning(false); };
+  const finishTech = async () => { let photoPatch = {}; if (afterPhoto && !ticket.hasAfterPhoto) { try { photoPatch = await TICKET_PHOTOS.save(ticket.id, "after", afterPhoto); } catch (e) {} } upd({ status: "pending_user", waitingReason: null, waitBall: null, ...clearWaitingTargetPatch(), hasAfterPhoto: !!afterPhoto || !!ticket.hasAfterPhoto, ...photoPatch }, "הטיפול הסתיים — הועבר לאישור הפותח" + (afterPhoto ? " (צורפה תמונת ביצוע)" : ""), "treat"); };
+  const takeMgr = () => upd({ status: "in_progress", waitingReason: null, waitBall: null, ...clearWaitingTargetPatch() }, "המנהל קיבל את הקריאה לטיפול", "accept");
+  const finishMgr = async () => { let photoPatch = {}; if (afterPhoto && !ticket.hasAfterPhoto) { try { photoPatch = await TICKET_PHOTOS.save(ticket.id, "after", afterPhoto); } catch (e) {} } upd({ status: "pending_admin", waitingReason: null, waitBall: null, ...clearWaitingTargetPatch(), hasAfterPhoto: !!afterPhoto || !!ticket.hasAfterPhoto, ...photoPatch }, "הטיפול הסתיים ע״י המנהל — הועבר לסגירת מנהל מערכת" + (afterPhoto ? " (צורפה תמונת ביצוע)" : ""), "treat"); };
+  const confirmUser = () => upd({ status: "pending_admin", waitingReason: null, waitBall: null, ...clearWaitingTargetPatch() }, "הפותח אישר שהתקלה טופלה", "approve");
+  const remarksUser = () => { if (!note.trim()) return; onUpdate({ ...ticket, status: "in_progress", waitingReason: null, waitBall: null, ...clearWaitingTargetPatch(), returned: true, returnReason: note.trim(), updatedAt: Date.now(), log: [...(ticket.log || []), e(`⤺ הוחזר לטיפול — הבעיה לא נפתרה: ${note.trim()}`, "reopen")] }); setNote(""); setReturning(false); };
   const addNote = () => { if (!note.trim()) return; upd({}, note.trim()); setNote(""); };
-  const cancelOwn = () => upd({ status: "cancelled" }, "הקריאה בוטלה", "cancel");
+  const cancelOwn = () => upd({ status: "cancelled", waitingReason: null, waitBall: null, ...clearWaitingTargetPatch() }, "הקריאה בוטלה", "cancel");
   const approveReport = () => {
     const fleet0 = p.fleet || [];
     const now = Date.now();

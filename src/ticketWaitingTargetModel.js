@@ -26,6 +26,15 @@ function waitingUserTarget(value) {
   return name ? { id: "", name } : null;
 }
 
+export function ticketRequesterWaitingTarget(ticket = {}) {
+  return waitingUserTarget(ticket.createdBy)
+    || waitingUserTarget(ticket.reportedBy)
+    || waitingUserTarget({
+      id: ticket.requesterId,
+      name: ticket.requesterName || ticket.openedBy
+    });
+}
+
 function waitingUntilTimestamp(value) {
   if (value === null || value === undefined || value === "") return null;
   const timestamp = typeof value === "number" ? value : Date.parse(String(value));

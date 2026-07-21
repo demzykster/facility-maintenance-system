@@ -53,6 +53,21 @@ const waitingUpdateAction = {
   execute: { method: "POST", path: "/api/tickets", bodyField: "ticket" }
 };
 
+const targetedWaitingUpdateAction = {
+  ...waitingUpdateAction,
+  id: "update_ticket_waiting_supplier",
+  payload: {
+    ...waitingUpdateAction.payload,
+    patch: {
+      status: "waiting",
+      waitingReason: "supplier",
+      waitBall: "executor",
+      waitingTargetType: "supplier",
+      waitingSupplier: "Quote Co"
+    }
+  }
+};
+
 const zoneUpdateAction = {
   id: "update_ticket_zone",
   type: "ticket.update",
@@ -255,6 +270,11 @@ describe("AI assist action execution model", () => {
   it("allows only complete human-confirmed ticket.create actions through the normal tickets API contract", () => {
     expect(canExecuteAiAssistAction(readyAction)).toBe(true);
     expect(canExecuteAiAssistAction(updateAction)).toBe(true);
+    expect(canExecuteAiAssistAction(targetedWaitingUpdateAction)).toBe(false);
+    expect(canExecuteAiAssistAction({
+      ...updateAction,
+      payload: { ticketId: "ticket-1", patch: { waitingSupplier: "Quote Co" } }
+    })).toBe(false);
     expect(canExecuteAiAssistAction(commentAction)).toBe(true);
     expect(canExecuteAiAssistAction(taskCreateAction)).toBe(true);
     expect(canExecuteAiAssistAction(meetingCreateAction)).toBe(true);
@@ -630,6 +650,48 @@ describe("AI assist action execution model", () => {
       { field: "waitingReason", before: "", after: "parts" },
       { field: "waitBall", before: "", after: "executor" }
     ]);
+  });
+
+  it("clears optional waiting targets when a confirmed AI update resumes work", () => {
+    const action = {
+      id: "resume_ticket_work",
+      type: "ticket.update",
+      requiresConfirmation: true,
+      missingFields: [],
+      payload: {
+        ticketId: "ticket-1",
+        patch: {
+          status: "in_progress",
+          waitingReason: null,
+          waitBall: null,
+          waitingTargetType: "none",
+          waitingSupplier: null,
+          waitingUser: null,
+          waitingUntil: null
+        }
+      },
+      execute: { method: "POST", path: "/api/tickets", bodyField: "ticket" }
+    };
+    const current = {
+      ...existingTicket,
+      status: "waiting",
+      waitingReason: "supplier",
+      waitBall: "executor",
+      waitingTargetType: "supplier",
+      waitingSupplier: "Quote Co"
+    };
+
+    const { ticket } = prepareAiTicketUpdateForSave(action, current, { name: "Vadim", role: "admin" }, { now: 3550 });
+
+    expect(ticket).toMatchObject({
+      status: "in_progress",
+      waitingReason: null,
+      waitBall: null,
+      waitingTargetType: "none",
+      waitingSupplier: null,
+      waitingUser: null,
+      waitingUntil: null
+    });
   });
 
   it("allows confirmed zone updates without accepting unsafe patch fields", () => {
