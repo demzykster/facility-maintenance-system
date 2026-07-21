@@ -19,7 +19,8 @@ describe("ticket detail lazy wiring", () => {
     expect(ticketDetailSource).toContain("function AdminTicketQuickEdit(");
     expect(ticketDetailSource).toContain("function CloseModal(");
     expect(ticketDetailSource).toContain("transportTicketSupplierName");
-    expect(ticketDetailSource).toContain("שיוך ספק / קבלן");
+    expect(ticketDetailSource).toContain("ספק / קבלן");
+    expect(ticketDetailSource).not.toContain("שיוך ספק / קבלן");
     expect(ticketDetailSource).toContain("ספק כלי");
   });
 

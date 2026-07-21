@@ -220,42 +220,43 @@ describe("ticket detail render smoke", () => {
     expect(next.log[1]).toMatchObject({ text: "ממתין · ממתינה לספק", kind: "waiting" });
   });
 
-  it("saves facility admin supplier, waiting reason, and note together", () => {
+  it("does not change the assigned supplier through the facility waiting draft", () => {
     const ticket = {
       id: "facility-1",
       track: "facility",
       status: "in_progress",
       waitingReason: "",
-      supplier: "",
+      supplier: "Execution Co",
+      assignee: "Technician",
+      routedTech: true,
       log: []
     };
     const next = applyFacilityAdminProcessingDraft(ticket, {
-      supplier: "משב מיזוג אוויר",
+      supplier: "Wrong Co",
       waitingReason: "supplier",
-      waitingSupplier: "משב מיזוג אוויר",
+      waitingSupplier: "Quote Co",
       note: "נבדק מול ספק"
     }, {
       now: 3,
       session: { name: "Vadim", role: "admin" },
       entryFor: (_session, text, kind) => ({ at: 3, by: "Vadim", text, kind }),
-      normalizeFacilitySupplierPatch: (_ticket, patch) => ({ ...patch, assignee: "", routedTech: true }),
+      normalizeFacilitySupplierPatch: () => { throw new Error("waiting workflow must not route execution"); },
       pausePatch: () => ({}),
       reasonBall: () => "admin",
       waitReasonLabel: () => "ממתינה לספק"
     });
 
     expect(next).toMatchObject({
-      supplier: "משב מיזוג אוויר",
-      assignee: "",
+      supplier: "Execution Co",
+      assignee: "Technician",
       routedTech: true,
       status: "waiting",
       waitingReason: "supplier",
       waitingTargetType: "supplier",
-      waitingSupplier: "משב מיזוג אוויר",
+      waitingSupplier: "Quote Co",
       updatedAt: 3
     });
     expect(next.log.map((entry) => entry.text)).toEqual([
-      "שויך לספק: משב מיזוג אוויר",
       "ממתין · ממתינה לספק",
       "נבדק מול ספק"
     ]);
@@ -313,7 +314,7 @@ describe("ticket detail render smoke", () => {
     expect(html).toContain("Quote Co");
   });
 
-  it("shows only category-relevant suppliers for facility routing", () => {
+  it("shows only category-relevant suppliers in the facility waiting target", () => {
     const config = {
       suppliers: ["Building Co", "Toyota"],
       supplierMeta: {
@@ -323,27 +324,37 @@ describe("ticket detail render smoke", () => {
     };
     const html = renderTicket("facility", {
       config,
+      ticket: {
+        status: "waiting",
+        waitingReason: "supplier",
+        waitingTargetType: "supplier",
+        waitingSupplier: "Building Co"
+      },
       ui: { supplierCandidatesForTicket }
     });
 
+    expect(html).toContain("ספק שממתינים לו");
     expect(html).toContain("Building Co");
     expect(html).not.toContain(">Toyota<");
+    expect(html).not.toContain("שיוך ספק / קבלן");
   });
 
-  it("keeps an existing legacy supplier selectable on a facility ticket", () => {
+  it("keeps facility supplier routing available during initial report approval", () => {
     const config = {
-      suppliers: ["Building Co", "Legacy Co"],
+      suppliers: ["Building General", "Toyota"],
       supplierMeta: {
-        "Building Co": { type: "facility", industries: ["facility:building"] }
+        "Building General": { type: "facility", industries: [] },
+        Toyota: { type: "transport", industries: ["transport"] }
       }
     };
     const html = renderTicket("facility", {
       config,
-      ticket: { supplier: "Legacy Co" },
+      ticket: { status: "pending_manager" },
       ui: { supplierCandidatesForTicket }
     });
 
-    expect(html).toContain("Building Co");
-    expect(html).toContain("Legacy Co");
+    expect(html).toContain("לאחר אישור — מי מטפל?");
+    expect(html).toContain("supplier:Building General");
+    expect(html).not.toContain("supplier:Toyota");
   });
 });

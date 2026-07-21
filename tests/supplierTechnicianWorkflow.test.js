@@ -39,7 +39,7 @@ describe("supplier technician workflow wiring", () => {
     expect(ticketVisibilitySource).toContain("unit.supplier !== session.supplier");
   });
 
-  it("routes ticket assignment through suppliers instead of direct technician picks", () => {
+  it("keeps supplier routing in initial approval while removing it from ordinary waiting processing", () => {
     const formStart = source.indexOf("function TicketForm(");
     const formEnd = source.indexOf("/* ============================================================ TICKET DETAIL */", formStart);
     const formSource = source.slice(formStart, formEnd);
@@ -51,7 +51,9 @@ describe("supplier technician workflow wiring", () => {
     expect(formSource).toContain("supplier: routedSupplier || \"\"");
     expect(formSource).toContain("supplierCandidatesForTicket");
     expect(detailSource).toContain("transportTicketSupplierName");
-    expect(detailSource).toContain("שיוך ספק / קבלן");
+    expect(detailSource).toContain('rev.route.startsWith("supplier:")');
+    expect(detailSource).toContain("facilityOwnerPatch");
+    expect(detailSource).not.toContain("שיוך ספק / קבלן");
     expect(detailSource).toContain("ספק כלי");
     expect(detailSource).not.toContain("p.techNames.map");
     expect(detailSource).not.toContain("שיוך טכנאי");

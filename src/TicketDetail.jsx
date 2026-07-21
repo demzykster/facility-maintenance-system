@@ -122,7 +122,6 @@ const text = (value) => String(value == null ? "" : value).trim();
 
 export function facilityAdminProcessingDraft(ticket = {}) {
   return {
-    supplier: text(ticket.supplier),
     waitingReason: ticket.status === "waiting" ? text(ticket.waitingReason) : "",
     ...ticketWaitingTargetDraft(ticket),
     note: ""
@@ -133,8 +132,7 @@ const sameWaitingUser = (left, right) => text(left?.id) === text(right?.id) && t
 
 export function facilityAdminProcessingHasChanges(ticket = {}, draft = {}) {
   const current = facilityAdminProcessingDraft(ticket);
-  return current.supplier !== text(draft.supplier)
-    || current.waitingReason !== text(draft.waitingReason)
+  return current.waitingReason !== text(draft.waitingReason)
     || current.waitingSupplier !== text(draft.waitingSupplier)
     || !sameWaitingUser(current.waitingUser, draft.waitingUser)
     || current.waitingUntil !== text(draft.waitingUntil)
@@ -147,21 +145,14 @@ export function applyFacilityAdminProcessingDraft(ticket = {}, draft = {}, optio
     session = {},
     now = Date.now(),
     entryFor: makeEntry = () => null,
-    normalizeFacilitySupplierPatch: normalizeSupplier = (_ticket, patch) => patch,
     pausePatch: makePausePatch = () => ({}),
     reasonBall: getReasonBall = () => "",
     waitReasonLabel: labelReason = (id) => id
   } = options;
-  const cleanSupplier = text(draft.supplier);
   const cleanReason = text(draft.waitingReason);
   const cleanNote = text(draft.note);
   const patch = {};
   const log = [];
-
-  if (cleanSupplier !== text(ticket.supplier)) {
-    Object.assign(patch, normalizeSupplier(ticket, { supplier: cleanSupplier }, session));
-    log.push({ text: cleanSupplier ? `שויך לספק: ${cleanSupplier}` : "שיוך הספק הוסר" });
-  }
 
   const currentReason = ticket.status === "waiting" ? text(ticket.waitingReason) : "";
   const waitingTargetPatch = buildTicketWaitingTargetPatch(cleanReason, draft);
@@ -243,7 +234,7 @@ export function TicketDetail(p) {
   const afterRef = useRef(null);
   useEffect(() => { let on = true; if (ticket?.hasPhoto) TICKET_PHOTOS.load(ticket, "before").then((d) => on && setPhoto(d)); return () => { on = false; }; }, [ticket?.id, ticket?.hasPhoto, ticket?.photoPath]);
   useEffect(() => { let on = true; setAfterPhoto(null); if (ticket?.hasAfterPhoto) TICKET_PHOTOS.load(ticket, "after").then((d) => on && setAfterPhoto(d)); return () => { on = false; }; }, [ticket?.id, ticket?.hasAfterPhoto, ticket?.afterPhotoPath]);
-  useEffect(() => { setFacilityAdminDraft(facilityAdminProcessingDraft(ticket)); setWaitingDraft(null); }, [ticket?.id, ticket?.status, ticket?.waitingReason, ticket?.waitingTargetType, ticket?.waitingSupplier, ticket?.waitingUser, ticket?.waitingUntil, ticket?.supplier]);
+  useEffect(() => { setFacilityAdminDraft(facilityAdminProcessingDraft(ticket)); setWaitingDraft(null); }, [ticket?.id, ticket?.status, ticket?.waitingReason, ticket?.waitingTargetType, ticket?.waitingSupplier, ticket?.waitingUser, ticket?.waitingUntil]);
   useEffect(() => { setAdminTransportExecutionOpen(false); }, [ticket?.id]);
   const grabAfter = (file) => { if (!file) return; const r = new FileReader(); r.onload = (ev) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const cv = document.createElement("canvas"); cv.width = width; cv.height = height; cv.getContext("2d").drawImage(img, 0, 0, width, height); setAfterPhoto(cv.toDataURL("image/jpeg", 0.6)); }; img.src = ev.target.result; }; r.readAsDataURL(file); };
   const exactRelated = useMemo(() => ticket?.forkliftId ? tickets.filter((t) => t.id !== ticket.id && t.forkliftId === ticket.forkliftId).sort((a, b) => b.createdAt - a.createdAt) : [], [ticket, tickets]);
@@ -315,7 +306,6 @@ export function TicketDetail(p) {
   };
   const repeat = () => onRepeat && onRepeat({ track: track, category: ticket.category, forkliftId: ticket.forkliftId, downtimeType: ticket.downtimeType, zone: ticket.zone, asset: ticket.asset, subject: ticket.subject, priority: ticket.priority });
   const ticketSupplierOptions = supplierCandidatesForTicket(config, ticket, p.fleet || []);
-  const ticketSupplierSelectOptions = ticket.supplier && !ticketSupplierOptions.includes(ticket.supplier) ? [ticket.supplier, ...ticketSupplierOptions] : ticketSupplierOptions;
   const waitingSupplierOptions = facilityAdminDraft.waitingSupplier && !ticketSupplierOptions.includes(facilityAdminDraft.waitingSupplier) ? [facilityAdminDraft.waitingSupplier, ...ticketSupplierOptions] : ticketSupplierOptions;
   const managerOptions = (p.users || []).filter((user) => user.active !== false && (user.role === "user" || user.role === "admin"));
   if ((session.role === "user" || session.role === "admin") && !managerOptions.some((user) => (user.id && user.id === session.id) || user.name === session.name)) managerOptions.unshift(session);
@@ -330,7 +320,6 @@ export function TicketDetail(p) {
       session,
       now,
       entryFor,
-      normalizeFacilitySupplierPatch,
       pausePatch,
       reasonBall,
       waitReasonLabel
@@ -535,8 +524,7 @@ export function TicketDetail(p) {
       {showAdminProcessingPanel && (<>
         {track === "facility" && <><SectionTitle>סיבות המתנה</SectionTitle>
           <div className="pr-row">{facilityAdminWaitReasons.map((r) => <button key={r.id} className={"pr-pick" + (facilityAdminDraft.waitingReason === r.id ? " on" : "")} onClick={() => selectFacilityWaitingReason(r.id)} style={facilityAdminDraft.waitingReason === r.id ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}>{r.label}</button>)}</div>
-          <WaitingTargetEditor draft={{ ...facilityAdminDraft, reason: facilityAdminDraft.waitingReason }} onChange={(targetDraft) => setFacilityAdminDraft((draft) => ({ ...draft, ...targetDraft }))} suppliers={waitingSupplierOptions} managers={managerOptions} ticket={ticket} />
-          <SectionTitle>שיוך ספק / קבלן</SectionTitle><select className="ta" value={facilityAdminDraft.supplier || ""} onChange={(ev) => setFacilityAdminDraft((draft) => ({ ...draft, supplier: ev.target.value }))}><option value="">— טיפול פנימי / ללא ספק —</option>{ticketSupplierSelectOptions.map((n) => <option key={n} value={n}>{n}</option>)}</select><div className="hint">הקריאה נפתחת לספק. כל הטכנאים המשויכים אליו יראו אותה ויוכלו לקבל לטיפול.</div></>}
+          <WaitingTargetEditor draft={{ ...facilityAdminDraft, reason: facilityAdminDraft.waitingReason }} onChange={(targetDraft) => setFacilityAdminDraft((draft) => ({ ...draft, ...targetDraft }))} suppliers={waitingSupplierOptions} managers={managerOptions} ticket={ticket} /></>}
         <SectionTitle>הערה</SectionTitle>
         {track === "facility" ? <input className="ta" value={facilityAdminDraft.note} onChange={(ev) => setFacilityAdminDraft((draft) => ({ ...draft, note: ev.target.value }))} placeholder="עדכון…" /> : <input className="ta" value={note} onChange={(ev) => setNote(ev.target.value)} placeholder="עדכון…" />}
         {track === "facility" ? <div style={{ display: "grid", gap: 8, marginTop: 16 }}><button className="btn-primary full" onClick={saveFacilityAdminProcessing} disabled={!facilityAdminProcessingDirty || !facilityAdminWaitingValid}><CheckCircle2 size={16} /> שמירת שינויים</button><button className="btn-ghost full" onClick={cancelFacilityAdminProcessing}><X size={15} /> ביטול ויציאה</button><button className="btn-close full" onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button></div> : <div style={{ display: "grid", gap: 8, marginTop: 16 }}><button className="btn-primary full" onClick={addNote} disabled={!note.trim()}><CheckCircle2 size={16} /> שמירת שינויים</button>{showTransportExecutionToggle && <button className="btn-ghost full" onClick={() => setAdminTransportExecutionOpen((value) => !value)}><Wrench size={15} /> {adminTransportExecutionOpen ? "הסתר פעולות ביצוע חריגות" : "הצג פעולות ביצוע חריגות"}</button>}<button className="btn-close full" onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button></div>}
