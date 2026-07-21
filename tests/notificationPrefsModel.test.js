@@ -103,6 +103,12 @@ describe("notification prefs model", () => {
     expect(nextBrowserNotificationEvent([{ key: "doc-194337", at: 3000 }], first).event).toBeNull();
   });
 
+  it("allows waiting return reminders to become browser notifications", () => {
+    expect(browserNotificationEvents([
+      { key: "wait-return-ticket-1-1000", at: 1000, kind: "waiting" }
+    ])).toEqual([{ key: "wait-return-ticket-1-1000", at: 1000, kind: "waiting" }]);
+  });
+
   it("throttles browser notifications while still remembering skipped event keys", () => {
     const first = nextBrowserNotificationEvent(
       [{ key: "ticket-1", at: 1000 }],

@@ -85,6 +85,7 @@ import { normalizedTicketAuthorityEnabled, ticketAuthorityFailureIssue, ticketsF
 import { normalizeTransportCreateResponsibility, ticketHolderLabel, transportTechnicianAssignee } from "./ticketResponsibilityModel.js";
 import { ticketListCardSemantics } from "./ticketListSemanticModel.js";
 import { ticketNextResponsibilityKey } from "./ticketNextResponsibilityModel.js";
+import { waitingReturnReminderEventsForSession } from "./waitingReturnReminderModel.js";
 import { supplierCandidatesForTicket, supplierHasFacilityCategory, supplierHasPpeScope, supplierHasTransportScope, supplierMeta as supMeta, supplierTypeFromMeta } from "./ticketSupplierFilterModel.js";
 import { fleetAuthorityFailureIssue, fleetForAuthority, normalizedFleetAuthorityEnabled } from "./fleetAuthorityModel.js";
 import { normalizedPmAuthorityEnabled, pmAuthorityFailureIssue, pmForAuthority } from "./pmAuthorityModel.js";
@@ -1464,6 +1465,13 @@ async function forgetAIMemoryFact(id) {
 const DEFAULT_NOTIF_PREFS = DEFAULT_LOCAL_NOTIFICATION_PREFS;
 function computeEvents(session, tickets, pm, fleet, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = [], ppeReqs = [], ppeItems = [], ppeOrders = []) {
   const ev = []; const vis = visibleTickets(session, tickets, fleet);
+  ev.push(...waitingReturnReminderEventsForSession({
+    session,
+    tickets,
+    fleet,
+    ticketNo,
+    trackLabel: (ticket) => TRACKS[ticket.track]?.short || ticket.track || "קריאה"
+  }));
   (tasks || []).forEach((t) => { if (!taskOpen(t)) return; if (!(t.ownerId === session.id || (t.responsibleIds || []).includes(session.id))) return; if (taskOverdue(t)) ev.push({ key: "task-ovd-" + t.id, at: t.dueAt, kind: "task", go: "tasks", title: `מטלה באיחור · ${t.title}`, body: tstOf(t.status).label }); else if ((t.mode === "deadline" || t.mode === "recurring") && t.dueAt && t.dueAt - Date.now() < 2 * 86400000) ev.push({ key: "task-due-" + t.id, at: t.dueAt, kind: "task", go: "tasks", title: `מטלה לקראת יעד · ${t.title}`, body: fmtDate(t.dueAt) }); else if (t.nextActionAt && t.nextActionAt - Date.now() < 86400000) ev.push({ key: "task-na-" + t.id, at: t.nextActionAt, kind: "task", go: "tasks", title: `מעקב מטלה · ${t.title}`, body: "הגיע תאריך מעקב" }); });
   (meetings || []).forEach((m) => { if (m.status !== "planned") return; if (!(m.ownerId === session.id || (m.participantIds || []).includes(session.id))) return; const dt = m.at - Date.now(); if (dt > -3600000 && dt < 24 * 3600000) ev.push({ key: "mtg-" + m.id, at: m.at, kind: "task", go: "tasks", title: `פגישה קרובה · ${m.title}`, body: `${fmtDate(m.at)} ${fmtTime(m.at)}` }); });
   const shiftEvents = (go) => {
