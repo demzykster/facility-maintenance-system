@@ -41,6 +41,21 @@ function sessionClientFor(profile = {}) {
   };
 }
 
+function pinSessionClientFor(user = {}) {
+  return {
+    findPinSessionUser: vi.fn().mockResolvedValue({
+      id: "tech-sharon",
+      role: "tech",
+      name: "שרון",
+      active: true,
+      techScope: "transport",
+      supplier: "טויוטה",
+      permissions: {},
+      ...user
+    })
+  };
+}
+
 const ticketRecord = (ticket = {}) => ({
   id: ticket.id || "T-1",
   track: ticket.track || "facility",
@@ -1062,6 +1077,63 @@ describe("tickets API handler", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ ok: true, tickets: tickets.slice(0, 2) });
+  });
+
+  it("hydrates CMMS PIN supplier technicians before applying transport ticket read scope", async () => {
+    const tickets = [
+      { id: "T-queue", track: "transport", status: "new", supplier: "טויוטה", assignee: "", routedTech: true },
+      { id: "T-accepted", track: "transport", status: "in_progress", supplier: "טויוטה", assignee: "שרון", routedTech: true },
+      { id: "T-rework", track: "transport", status: "rework", supplier: "טויוטה", assignee: "שרון", routedTech: true },
+      { id: "T-returned", track: "transport", status: "in_progress", supplier: "טויוטה", assignee: "שרון", routedTech: true, returned: true },
+      { id: "T-legacy-queue", track: "transport", status: "new", supplier: "טויוטה", assignee: "טויוטה", routedTech: true },
+      { id: "T-other-tech", track: "transport", status: "in_progress", supplier: "טויוטה", assignee: "דוד", routedTech: true },
+      { id: "T-other-supplier", track: "transport", status: "new", supplier: "יונגהיינריך", assignee: "", routedTech: true },
+      { id: "F-facility", track: "facility", status: "new", assignee: "", routedTech: true }
+    ];
+    const driver = { list: vi.fn().mockResolvedValue(tickets), get: vi.fn() };
+    const pinSessionClient = pinSessionClientFor();
+    const token = signCmmsSessionToken("tech-sharon", "tech", "", "session-secret", Date.now()).token;
+    const handler = createTicketsApiHandler({
+      driver,
+      pinSessionClient,
+      env: { CMMS_SESSION_SECRET: "session-secret" }
+    });
+
+    const res = await call(handler, {
+      method: "GET",
+      headers: { authorization: `Bearer ${token}` }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, tickets: tickets.slice(0, 5) });
+    expect(pinSessionClient.findPinSessionUser).toHaveBeenCalledWith(expect.objectContaining({
+      id: "tech-sharon",
+      role: "tech"
+    }));
+  });
+
+  it("shows a supplier queue to another supplier technician without exposing accepted tickets", async () => {
+    const tickets = [
+      { id: "T-queue", track: "transport", status: "new", supplier: "טויוטה", assignee: "", routedTech: true },
+      { id: "T-sharon", track: "transport", status: "in_progress", supplier: "טויוטה", assignee: "שרון", routedTech: true },
+      { id: "T-other-supplier", track: "transport", status: "new", supplier: "יונגהיינריך", assignee: "", routedTech: true }
+    ];
+    const driver = { list: vi.fn().mockResolvedValue(tickets), get: vi.fn() };
+    const pinSessionClient = pinSessionClientFor({ id: "tech-david", name: "דוד" });
+    const token = signCmmsSessionToken("tech-david", "tech", "", "session-secret", Date.now()).token;
+    const handler = createTicketsApiHandler({
+      driver,
+      pinSessionClient,
+      env: { CMMS_SESSION_SECRET: "session-secret" }
+    });
+
+    const res = await call(handler, {
+      method: "GET",
+      headers: { authorization: `Bearer ${token}` }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, tickets: [tickets[0]] });
   });
 
   it("gets one normalized ticket with active file metadata", async () => {

@@ -3,7 +3,12 @@ import { normalizeTicketRecord } from "../../src/ticketRecordModel.js";
 import { sendServerError } from "../httpErrors.js";
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 import { bearerToken } from "../session/authCookie.js";
-import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
+import {
+  buildCmmsPinSessionPayload,
+  buildSessionPayload,
+  createSupabaseCmmsPinSessionClient,
+  createSupabaseSessionClient
+} from "../session/sessionHandler.js";
 import { verifyCmmsSessionToken } from "../session/cmmsSessionToken.js";
 import { kvWritePermissionError } from "../kv/permissionPolicy.js";
 import { createSupabaseTicketsDriverFromEnv } from "./supabaseTicketsDriver.js";
@@ -29,14 +34,31 @@ const readBody = async (req) => {
   return text ? JSON.parse(text) : {};
 };
 
-async function authorize(req, env, fetchImpl, sessionClient) {
+async function authorize(req, env, fetchImpl, sessionClient, pinSessionClient) {
   const token = bearerToken(req);
   if (!token) return { ok: false, status: 401, error: "supabase_access_token_required" };
 
   const cmmsSecret = String(env.CMMS_SESSION_SECRET || "").trim();
   if (cmmsSecret) {
     const cmmsUser = verifyCmmsSessionToken(token, cmmsSecret);
-    if (cmmsUser) return { ok: true, user: cmmsUser };
+    if (cmmsUser) {
+      if (cmmsUser.role !== "tech") return { ok: true, user: cmmsUser };
+      const client = pinSessionClient || createSupabaseCmmsPinSessionClient({
+        url: env.SUPABASE_URL,
+        serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
+        fetchImpl
+      });
+      if (!client) return { ok: false, status: 503, error: "cmms_session_backend_not_configured" };
+      try {
+        const appUser = await client.findPinSessionUser(cmmsUser);
+        const session = buildCmmsPinSessionPayload(cmmsUser, appUser);
+        if (!session.ok) return { ok: false, status: session.error === "app_user_disabled" ? 403 : 401, error: session.error };
+        if (session.user.mustChangePassword) return { ok: false, status: 403, error: "password_change_required" };
+        return { ok: true, user: session.user };
+      } catch {
+        return { ok: false, status: 401, error: "cmms_session_lookup_failed" };
+      }
+    }
   }
 
   const client = sessionClient || createSupabaseSessionClient({
@@ -160,7 +182,7 @@ const deleteTicketOwnedFiles = async ({ ticketId, fileDriver, metadataDriver }) 
   return cleanup;
 };
 
-export function createTicketsApiHandler({ driver = null, auditDriver = null, metadataDriver = null, fileDriver = null, fleetDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
+export function createTicketsApiHandler({ driver = null, auditDriver = null, metadataDriver = null, fileDriver = null, fleetDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null, pinSessionClient = null } = {}) {
   const backendDriver = driver || createSupabaseTicketsDriverFromEnv(env, fetchImpl);
   const backendAuditDriver = auditDriver || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
   const backendMetadataDriver = metadataDriver || (env.CMMS_FILE_METADATA_DRIVER === "supabase" ? createSupabaseFileMetadataDriverFromEnv(env, fetchImpl) : null);
@@ -168,7 +190,7 @@ export function createTicketsApiHandler({ driver = null, auditDriver = null, met
   const backendFleetDriver = fleetDriver || createSupabaseFleetDriverFromEnv(env, fetchImpl);
 
   return async function ticketsApiHandler(req, res) {
-    const auth = await authorize(req, env, fetchImpl, sessionClient);
+    const auth = await authorize(req, env, fetchImpl, sessionClient, pinSessionClient);
     if (!auth.ok) return json(res, auth.status, { error: auth.error });
     if (!backendDriver) return json(res, 503, { error: "tickets_backend_not_configured" });
 
