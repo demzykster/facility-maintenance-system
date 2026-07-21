@@ -27,6 +27,9 @@ const isTransportTicket = (ticket = {}) =>
 
 const isClosedTicket = (ticket = {}) => CLOSED_STATUSES.has(ticket.status || "");
 
+const isCriticalDowntimeTicket = (ticket = {}) =>
+  (ticket.downtimeType || ticket.downtime_type) === "critical";
+
 const downtimeEnd = (ticket, now) => {
   const recordedEnd = finiteTimestamp(ticket.backInServiceAt)
     || finiteTimestamp(ticket.downtimeEnd);
@@ -70,7 +73,7 @@ export function problematicTransportTicketRows(tickets = [], options = {}) {
     if (ticket.wearType === "disproportionate") {
       reasons.push(PROBLEMATIC_TRANSPORT_REASON.UNNATURAL_DAMAGE);
     }
-    if (downtimeMs != null && downtimeMs > LONG_DOWNTIME_MS) {
+    if (isCriticalDowntimeTicket(ticket) && downtimeMs != null && downtimeMs > LONG_DOWNTIME_MS) {
       reasons.push(PROBLEMATIC_TRANSPORT_REASON.LONG_DOWNTIME);
     }
     if (costAmount != null) {

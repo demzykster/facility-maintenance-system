@@ -18,6 +18,7 @@ const transportTicket = (patch = {}) => ({
   track: "transport",
   status: "in_progress",
   forkliftId: "fleet-a",
+  downtimeType: "critical",
   downtimeStart: NOW - 49 * HOUR,
   createdAt: NOW - 50 * HOUR,
   updatedAt: NOW - HOUR,
@@ -25,8 +26,9 @@ const transportTicket = (patch = {}) => ({
 });
 
 describe("problematic transport tickets model", () => {
-  it("uses a strict greater-than 48 hour downtime threshold", () => {
+  it("requires critical transport downtime and a strict greater-than 48 hour threshold", () => {
     const rows = problematicTransportTicketRows([
+      transportTicket({ id: "non-critical", downtimeType: "minor", downtimeStart: NOW - 72 * HOUR }),
       transportTicket({ id: "exact", downtimeStart: NOW - 48 * HOUR }),
       transportTicket({ id: "over", downtimeStart: NOW - 48 * HOUR - 1 })
     ], { fleet, now: NOW });
@@ -95,6 +97,70 @@ describe("problematic transport tickets model", () => {
       PROBLEMATIC_TRANSPORT_REASON.LONG_DOWNTIME,
       PROBLEMATIC_TRANSPORT_REASON.CLOSED_WITH_COST
     ]);
+  });
+
+  it("keeps non-critical long downtime tickets only for their independent cost reason", () => {
+    const rows = problematicTransportTicketRows([
+      transportTicket({
+        id: "non-critical-cost",
+        downtimeType: "minor",
+        status: "done",
+        downtimeEnd: NOW,
+        closure: { costAmount: 500, signedAt: NOW }
+      })
+    ], { fleet, now: NOW });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].reasons).toEqual([PROBLEMATIC_TRANSPORT_REASON.CLOSED_WITH_COST]);
+  });
+
+  it("keeps non-critical long downtime tickets only for their independent damage reason", () => {
+    const rows = problematicTransportTicketRows([
+      transportTicket({
+        id: "non-critical-damage",
+        downtimeType: "has_replacement",
+        wearType: "disproportionate"
+      })
+    ], { fleet, now: NOW });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].reasons).toEqual([PROBLEMATIC_TRANSPORT_REASON.UNNATURAL_DAMAGE]);
+  });
+
+  it("does not infer critical downtime for legacy tickets without the structured flag", () => {
+    const rows = problematicTransportTicketRows([
+      {
+        id: "legacy-long-downtime",
+        forkliftId: "fleet-a",
+        status: "in_progress",
+        downtimeStart: NOW - 72 * HOUR,
+        createdAt: NOW - 72 * HOUR
+      },
+      {
+        id: "legacy-critical",
+        forkliftId: "fleet-a",
+        status: "in_progress",
+        downtime_type: "critical",
+        downtimeStart: NOW - 72 * HOUR,
+        createdAt: NOW - 72 * HOUR
+      }
+    ], { fleet, now: NOW });
+
+    expect(rows.map((row) => row.ticket.id)).toEqual(["legacy-critical"]);
+    expect(rows[0].reasons).toEqual([PROBLEMATIC_TRANSPORT_REASON.LONG_DOWNTIME]);
+  });
+
+  it("excludes a T-001-like non-critical ticket with long elapsed downtime only", () => {
+    const rows = problematicTransportTicketRows([
+      transportTicket({
+        id: "T-001-194340",
+        asset: "194340",
+        downtimeType: "minor",
+        downtimeStart: NOW - 10 * 24 * HOUR
+      })
+    ], { fleet, now: NOW });
+
+    expect(rows).toEqual([]);
   });
 
   it("excludes facility tickets and tolerates old transport tickets without optional fields", () => {
