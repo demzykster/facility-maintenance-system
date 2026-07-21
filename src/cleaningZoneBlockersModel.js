@@ -18,6 +18,15 @@ export function cleaningZoneBlockerCount(blockers = {}) {
   return (safeBlockers.rounds || []).length + (safeBlockers.complaints || []).length + (safeBlockers.managers || []).length;
 }
 
+export function cleaningZoneHistoryRecordCount(blockers = {}) {
+  const safeBlockers = blockers || {};
+  return (safeBlockers.rounds || []).length + (safeBlockers.complaints || []).length;
+}
+
+export function canDeleteCleaningZoneWithoutHistory(blockers = {}) {
+  return cleaningZoneHistoryRecordCount(blockers) === 0;
+}
+
 export function cleaningZoneDeletePlan(zoneId, data = {}) {
   const id = textId(zoneId);
   const blockers = cleaningZoneDeleteBlockers(id, data);

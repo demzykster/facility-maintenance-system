@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  canDeleteCleaningZoneWithoutHistory,
   cleaningZoneBlockerCount,
   cleaningZoneDeleteBlockers,
-  cleaningZoneDeletePlan
+  cleaningZoneDeletePlan,
+  cleaningZoneHistoryRecordCount
 } from "../src/cleaningZoneBlockersModel.js";
 
 describe("cleaningZoneDeleteBlockers", () => {
@@ -42,7 +44,7 @@ describe("cleaningZoneDeleteBlockers", () => {
     expect(plan.summary).toEqual({ rounds: 1, complaints: 1, managers: 1 });
   });
 
-  it("does not treat linked history as a delete blocker anymore", () => {
+  it("treats linked rounds and complaints as retained history that blocks deletion", () => {
     const blockers = cleaningZoneDeleteBlockers("z1", {
       rounds: [{ id: "r1", zoneId: "z1" }],
       complaints: [{ id: "c1", zoneId: "z1" }],
@@ -50,9 +52,25 @@ describe("cleaningZoneDeleteBlockers", () => {
     });
 
     expect(cleaningZoneBlockerCount(blockers)).toBe(3);
+    expect(cleaningZoneHistoryRecordCount(blockers)).toBe(2);
+    expect(canDeleteCleaningZoneWithoutHistory(blockers)).toBe(false);
+  });
+
+  it("allows zone deletion when only manager links need cleanup", () => {
+    const blockers = cleaningZoneDeleteBlockers("z1", {
+      rounds: [{ id: "r1", zoneId: "z2" }],
+      complaints: [{ id: "c1", zoneId: "z3" }],
+      users: [{ id: "u1", mgrZones: ["z1"] }]
+    });
+
+    expect(cleaningZoneBlockerCount(blockers)).toBe(1);
+    expect(cleaningZoneHistoryRecordCount(blockers)).toBe(0);
+    expect(canDeleteCleaningZoneWithoutHistory(blockers)).toBe(true);
   });
 
   it("treats missing blocker details as empty", () => {
     expect(cleaningZoneBlockerCount(null)).toBe(0);
+    expect(cleaningZoneHistoryRecordCount(null)).toBe(0);
+    expect(canDeleteCleaningZoneWithoutHistory(null)).toBe(true);
   });
 });

@@ -62,7 +62,7 @@ import { softResetAppCache } from "./appCacheResetModel.js";
 import { DEFAULT_LANGUAGE, languageCookieString, languageDirection, languageFromCookie, languageOptions, normalizeLanguageCode, preferredInitialLanguage } from "./languageModel.js";
 import { uiText } from "./uiI18nModel.js";
 import { isStandaloneDisplay, pwaInstallPromptMode } from "./pwaInstallModel.js";
-import { cleaningZoneBlockerCount, cleaningZoneDeleteBlockers, cleaningZoneDeletePlan } from "./cleaningZoneBlockersModel.js";
+import { canDeleteCleaningZoneWithoutHistory, cleaningZoneDeleteBlockers, cleaningZoneDeletePlan, cleaningZoneHistoryRecordCount } from "./cleaningZoneBlockersModel.js";
 import { appIssueScreenContext, captureAppIssueScreenshot } from "./appIssueScreenshot.js";
 import { canPerformCleaning, canReceiveCleaningComplaints, hasCleaningAccess, isWorkerLike, normalizeCleaningAccess } from "./cleaningAccessModel.js";
 import { defaultWorkerView } from "./workerProfileModel.js";
@@ -3114,6 +3114,10 @@ export default function App() {
     const plan = cleaningZoneDeletePlan(id, { rounds, complaints, users });
     if (!plan.zoneId) return false;
     const linked = cleaningZoneDeleteBlockers(plan.zoneId, { rounds, complaints, users });
+    if (!canDeleteCleaningZoneWithoutHistory(linked)) {
+      setToast("לא ניתן למחוק אזור עם היסטוריית סבבים או דיווחים. בטלו פעילות במקום מחיקה.");
+      return false;
+    }
     for (const manager of plan.updatedManagers) {
       if (!await saveUser(manager)) return false;
     }
@@ -5005,7 +5009,8 @@ function ZoneForm({ zone, config, zones = [], cleaners, managers, onCancel, onSa
   const [mgrIds, setMgrIds] = useState((managers || []).filter((m) => (m.mgrZones || []).includes(zone.id)).map((m) => m.id));
   const [openWin, setOpenWin] = useState(null);
   const [openChecklistTranslations, setOpenChecklistTranslations] = useState({});
-  const blockerCount = cleaningZoneBlockerCount(deleteBlockers);
+  const historyRecordCount = cleaningZoneHistoryRecordCount(deleteBlockers);
+  const managerLinkCount = (deleteBlockers?.managers || []).length;
   const toggleDay = (d) => setActiveDays((s) => (s.includes(d) ? s.filter((x) => x !== d) : [...s, d]).sort((a, b) => a - b));
   const toggleWinItem = (i, id) => setWindows((s) => s.map((w, j) => { if (j !== i) return w; const valid = checklist.filter((c) => (c.label || "").trim()).map((c) => c.id); const cur = Array.isArray(w.items) ? w.items.filter((x) => valid.includes(x)) : valid.slice(); const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]; return { ...w, items: next.length >= valid.length ? null : next }; }));
   const setCl = (i, v) => setChecklist((s) => s.map((x, j) => (j === i ? { ...x, label: v } : x)));
@@ -5073,16 +5078,17 @@ function ZoneForm({ zone, config, zones = [], cleaners, managers, onCancel, onSa
       </div>
       {managers && <div className="field"><span>מנהלי מחלקה שרואים את האזור</span>{managers.length === 0 ? <div className="hint">אין מנהלי מחלקה. הוסיפו תחת «צוות ומשתמשים».</div> : <div className="chk-grid">{managers.map((m) => <label key={m.id} className={"chk-pill" + (mgrIds.includes(m.id) ? " on" : "")}><input type="checkbox" checked={mgrIds.includes(m.id)} onChange={() => setMgrIds((s) => s.includes(m.id) ? s.filter((x) => x !== m.id) : [...s, m.id])} /> {m.name}</label>)}</div>}<div className="hint">אותה הגדרה כמו ב«צוות ומשתמשים» של המנהל — נשמרת לשני הכיוונים.</div></div>}
       <label className="chk-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> אזור פעיל</label>
-      {canDelete && blockerCount > 0 && <div className="note" style={{ marginTop: 8, borderColor: "#FDE68A" }}><AlertTriangle size={14} /> מחיקת האזור תמחק גם את ההיסטוריה המקושרת אליו.
+      {canDelete && historyRecordCount > 0 && <div className="note" style={{ marginTop: 8, borderColor: "#FDE68A" }}><AlertTriangle size={14} /> לא ניתן למחוק אזור עם היסטוריית סבבים או דיווחים. כבו את האזור כדי להפסיק שימוש עתידי בלי למחוק ראיות תפעוליות.
         <div className="u-filters" style={{ marginTop: 8 }}>
           {(deleteBlockers?.rounds || []).length > 0 && <button type="button" className="btn-ghost sm" onClick={() => onOpenBlocker("rounds")}>סבבים: {deleteBlockers.rounds.length}</button>}
           {(deleteBlockers?.complaints || []).length > 0 && <button type="button" className="btn-ghost sm" onClick={() => onOpenBlocker("complaints")}>דיווחים: {deleteBlockers.complaints.length}</button>}
-          {(deleteBlockers?.managers || []).length > 0 && <span className="badge sm" style={{ background: "#FEF3C7", color: "#92400E" }}>יוסר ממנהלים: {deleteBlockers.managers.map((m) => m.name || "—").join(", ")}</span>}
+          {managerLinkCount > 0 && <span className="badge sm" style={{ background: "#FEF3C7", color: "#92400E" }}>משויך למנהלים: {deleteBlockers.managers.map((m) => m.name || "—").join(", ")}</span>}
         </div>
       </div>}
+      {canDelete && historyRecordCount === 0 && managerLinkCount > 0 && <div className="note" style={{ marginTop: 8, borderColor: "#FDE68A" }}><AlertTriangle size={14} /> מחיקת האזור תסיר אותו גם מרשימת אזורי המנהלים: {deleteBlockers.managers.map((m) => m.name || "—").join(", ")}.</div>}
       {err && <div className="err">{err}</div>}
       <button className="btn-primary full" onClick={save} disabled={busy}>{busy ? "שומר…" : "שמירה"}</button>
-      {canDelete && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label={blockerCount > 0 ? "מחיקת אזור והיסטוריה" : "מחיקת אזור"} onConfirm={onDelete} />}
+      {canDelete && historyRecordCount === 0 && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label={managerLinkCount > 0 ? "מחיקת אזור והסרה ממנהלים" : "מחיקת אזור"} onConfirm={onDelete} />}
       <div style={{ height: 24 }} />
     </div></div>);
 }
