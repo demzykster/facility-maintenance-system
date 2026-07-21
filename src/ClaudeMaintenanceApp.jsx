@@ -4289,14 +4289,25 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
       ? (initialSetup.user?.phone || initialSetup.identifier || identifier.trim())
       : (initialSetup.user?.workerNo || initialSetup.user?.email || initialSetup.identifier || identifier.trim())
   );
+  const brandName = brandCompanyName(config);
   return (
     <div className="login-bg">
+      <div className="login-shell">
+        <div className="login-visual" aria-hidden="true">
+          <div className="login-visual-copy">
+            <span>Ogen CMMS</span>
+            <b>תפעול שקט למחסן עובד</b>
+          </div>
+        </div>
+        <main className="login-public-panel" aria-label={t("login.title")}>
+          <div className="login-toolbar">
+            <LanguagePicker value={language} onChange={setLanguage} compact />
+            <button type="button" className="login-theme" onClick={toggleTheme} aria-label={theme === "dark" ? "מצב בהיר" : "מצב כהה"}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
+          </div>
       <div className="login-card">
         <div className="login-card-head">
-          <div className="brand"><BrandMark logo={config?.brandLogo} /><div><div className="brand-title">{brandCompanyName(config)}</div>{brandSiteSubtitle(config) && <div className="brand-sub">{brandSiteSubtitle(config)}</div>}</div></div>
-          <button className="login-theme" onClick={toggleTheme} aria-label={theme === "dark" ? "מצב בהיר" : "מצב כהה"}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
+          <div className="brand"><BrandMark logo={config?.brandLogo} /><div><div className="brand-title">{brandName}</div>{brandSiteSubtitle(config) && <div className="brand-sub">{brandSiteSubtitle(config)}</div>}</div></div>
         </div>
-        <LanguagePicker value={language} onChange={setLanguage} />
         {scannedZoneId && !skipScanLanding && !passwordChange && !initialSetup && !resolved ? <ScanPublicLanding zone={scannedLandingZone} invalid={!scannedLandingZone} language={language} onReport={() => setPub(true)} onLogin={() => setSkipScanLanding(true)} /> : passwordChange ? (<>
           <div className="login-q">{t("login.firstPassword")}</div>
           <div className="hint" style={{ marginBottom: 10 }}>נדרש להגדיר סיסמה חדשה לפני כניסה למערכת.</div>
@@ -4315,10 +4326,10 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
           <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setInitialSetup(null); setNewPassword(""); setNewPasswordConfirm(""); setErr(""); }}>{t("login.back")}</button>
         </>) : !resolved ? (<>
           <div className="login-q">{t("login.title")}</div>
-          <label className="field"><span>{t("login.identity")}</span><input className="ltr-input" dir="ltr" value={identifier} onChange={(e) => { setIdentifier(e.target.value); setErr(""); }} autoCapitalize="off" placeholder="" onKeyDown={(e) => e.key === "Enter" && submitIdentifier()} autoFocus /></label>
+          <label className="field login-identity-field"><span>{t("login.identity")}</span><div className="login-input-wrap"><User size={17} aria-hidden="true" /><input className="ltr-input" dir="ltr" value={identifier} onChange={(e) => { setIdentifier(e.target.value); setErr(""); }} autoCapitalize="off" autoComplete="username" name="login-identifier" placeholder="" onKeyDown={(e) => e.key === "Enter" && submitIdentifier()} autoFocus /></div></label>
           <label className="chk-line"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> {t("login.remember")}</label>
           {err && <div className="err">{err}</div>}
-          <button className="btn-primary full" onClick={submitIdentifier} disabled={busy}>{busy ? "בודק…" : t("login.continue")}</button>
+          <button type="button" className="btn-primary full" onClick={submitIdentifier} disabled={busy}>{busy ? "בודק…" : t("login.continue")}</button>
         </>) : (<>
           <div className="login-q">{t("login.hello", { name: resolved.user.name })}</div>
           <div className="hint" style={{ marginBottom: 10 }}>{resolved.identifierType === "email" ? t("login.enterPassword") : t("login.enterPin")}</div>
@@ -4330,9 +4341,11 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
           <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setResolved(null); setPassword(""); setCode(""); setErr(""); }}>{t("login.back")}</button>
         </>)}
         {seedPolicy.allowBuiltinDemoUsers && <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 12, lineHeight: 1.6, background: "var(--surface-2)", padding: "8px 10px", borderRadius: 8 }}>גישת הדגמה: owner@example.local + סיסמה demo1234 · עובד 1042 + קוד 1234 · טכנאי 1234</div>}
-        <div className="login-foot">{seedPolicy.allowBuiltinDemoUsers ? "גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית" : <><span><span>{t("login.developedBy")} </span><bdi dir="ltr">Vadim Demchuk</bdi><span> · </span><bdi dir="ltr">2026</bdi></span><span><span>{t("login.version")} </span><bdi dir="ltr">v{APP_VERSION}</bdi></span></>}</div>
+        <div className="login-foot">{seedPolicy.allowBuiltinDemoUsers ? "גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית" : <><span>© <bdi dir="ltr">2026</bdi> {brandName}</span><span><span>{t("login.version")} </span><bdi dir="ltr">v{APP_VERSION}</bdi></span><span className="login-credit"><span>{t("login.developedBy")} </span><bdi dir="ltr">Vadim Demchuk</bdi></span></>}</div>
         <InstallAppPrompt language={language} companyName={brandCompanyName(config)} />
-        <button className="pub-entry" onClick={() => setPub(true)}><AlertTriangle size={15} /> {t("login.reportWithoutLogin")}</button>
+      </div>
+          <button type="button" className="pub-entry" onClick={() => setPub(true)}><span className="pub-entry-ic"><Camera size={18} /></span><span><b>{t("login.reportWithoutLogin")}</b><small>{t("public.scanRequired")}</small></span></button>
+        </main>
       </div>
       {pub && <PublicReport zones={zones} scannedZoneId={scannedZoneId} allowManualZonePick={seedPolicy.allowDemoData} language={language} onSubmit={onAnonReport} onClose={() => setPub(false)} />}
     </div>
@@ -8172,9 +8185,16 @@ a{color:inherit;}
   .bi-panel{content-visibility:auto;contain-intrinsic-size:1px 260px;}
 }
 
-.login-bg{min-height:100vh;background:linear-gradient(160deg,#FFFFFF,#E6E7E9);display:flex;align-items:center;justify-content:center;padding:20px;position:relative;}
-.login-card{background:var(--surface);color:var(--ink);border-radius:20px;padding:26px 22px;width:100%;max-width:390px;box-shadow:0 20px 50px rgba(0,0,0,.35);animation:cmmsSurfaceIn 260ms var(--ease-out) both;}
-.login-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:22px;}
+.login-bg{min-height:100vh;background:linear-gradient(160deg,#FFFFFF,#E6E7E9);display:flex;align-items:center;justify-content:center;padding:20px;position:relative;overflow-x:hidden;}
+.login-shell{width:min(1060px,100%);display:grid;grid-template-columns:minmax(0,1.08fr) minmax(360px,.92fr);align-items:stretch;background:rgba(255,255,255,.62);border:1px solid rgba(201,205,209,.72);border-radius:28px;box-shadow:0 24px 70px rgba(46,49,56,.18);overflow:hidden;animation:cmmsSurfaceIn 260ms var(--ease-out) both;}
+.login-visual{min-height:620px;background:linear-gradient(90deg,rgba(11,18,27,.78),rgba(11,18,27,.22)),url("/visuals/warehouse-entry.jpg") center/cover no-repeat;display:flex;align-items:flex-end;padding:34px;color:#fff;}
+.login-visual-copy{max-width:330px;display:flex;flex-direction:column;gap:8px;text-shadow:0 2px 16px rgba(0,0,0,.32);}
+.login-visual-copy span{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.68);}
+.login-visual-copy b{font-family:var(--font-head);font-size:30px;line-height:1.12;font-weight:750;}
+.login-public-panel{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:14px;padding:26px;background:var(--surface);}
+.login-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:2px;}
+.login-card{background:var(--surface);color:var(--ink);border-radius:20px;padding:26px 22px;width:100%;max-width:none;box-shadow:0 0 0 1px rgba(201,205,209,.64),var(--control-shadow);}
+.login-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px;}
 .login-theme{width:44px;height:44px;border-radius:11px;color:var(--muted);background:var(--surface-2);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .login-theme:hover{border-color:var(--primary);color:var(--primary);}
 .language-picker{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 14px;color:var(--muted);font-size:12px;font-weight:700;}
@@ -8192,8 +8212,12 @@ a{color:inherit;}
 .brand-mark.sm .brand-mark-core{width:10px;height:10px;border-width:1.7px;border-radius:3px;}
 .brand-title{font-family:var(--font-head);font-weight:700;font-size:24px;line-height:1;}
 .brand-title.sm{font-size:18px;color:var(--ink);line-height:1.12;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.brand-sub{color:var(--muted);font-size:13px;margin-top:3px;}.brand-sub.sm{color:var(--side-ink);font-size:11.5px;max-width:160px;line-height:1.28;}
+.brand-sub{color:var(--muted);font-size:13px;margin-top:3px;line-height:1.35;overflow-wrap:anywhere;}.brand-sub.sm{color:var(--side-ink);font-size:11.5px;max-width:160px;line-height:1.28;}
 .login-q{font-family:var(--font-head);font-weight:600;font-size:16px;margin:8px 0 14px;}
+.login-identity-field{margin-bottom:13px;}
+.login-input-wrap{display:flex;align-items:center;gap:9px;border:1.5px solid var(--line);border-radius:11px;background:var(--input);padding-inline:12px;color:var(--muted);}
+.login-input-wrap:focus-within{border-color:rgba(31,78,140,.68);box-shadow:0 0 0 3px rgba(31,78,140,.12);}
+.login-input-wrap input{border:0!important;background:transparent!important;padding-inline:0!important;box-shadow:none!important;min-width:0;}
 .login-users{max-height:48vh;overflow-y:auto;}
 .role-btn{display:flex;align-items:center;gap:12px;width:100%;text-align:right;background:var(--surface-2);border:1.5px solid var(--line);border-radius:14px;padding:13px;margin-bottom:10px;color:var(--ink);}
 .role-btn:hover{border-color:var(--primary);}
@@ -8203,6 +8227,7 @@ a{color:inherit;}
 .login-alt{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;margin-top:12px;padding:11px;border:1.5px solid var(--line);border-radius:11px;background:var(--surface);color:var(--ink);font-weight:600;font-size:13.5px;}
 .login-foot{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;color:var(--muted);font-size:11.5px;margin-top:18px;line-height:1.45;}
 .login-foot>span{display:block;}
+.login-credit{opacity:.58;}
 .install-prompt{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:9px;margin-top:12px;padding:10px 11px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);color:var(--ink);text-align:start;}
 .install-ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(31,78,140,.09);color:var(--primary);flex-shrink:0;}
 .install-copy{min-width:0;display:flex;flex-direction:column;gap:2px;line-height:1.35;}
@@ -8213,7 +8238,15 @@ a{color:inherit;}
 .install-x{width:44px;height:44px;border-radius:11px;color:var(--muted);display:flex;align-items:center;justify-content:center;}
 .install-x:hover{background:var(--line);color:var(--ink);}
 @media(max-width:430px){.install-prompt{grid-template-columns:auto minmax(0,1fr) auto auto;}.install-copy b{font-size:12.5px;}.install-copy span{font-size:11.5px;}.install-btn,.install-x{width:44px;height:44px;}.install-x{align-self:center;}}
-@media (min-width:900px){.login-bg{padding:36px;}.login-card{max-width:500px;padding:30px 30px 28px;}.login-q{font-size:17px;}}
+@media (min-width:900px){.login-bg{padding:36px;}.login-card{padding:30px 30px 28px;}.login-q{font-size:17px;}}
+@media (max-width:860px){
+  .login-bg{align-items:flex-start;padding:0;background:var(--surface);}
+  .login-shell{min-height:100vh;width:100%;border:0;border-radius:0;box-shadow:none;grid-template-columns:1fr;background:var(--surface);}
+  .login-visual{min-height:150px;padding:22px;background-position:center 42%;align-items:flex-end;}
+  .login-visual-copy b{font-size:21px;}.login-visual-copy span{font-size:10px;}
+  .login-public-panel{padding:18px 16px calc(22px + env(safe-area-inset-bottom));justify-content:flex-start;}
+  .login-card{border-radius:18px;padding:22px 18px;}
+}
 
 .field{display:block;margin-bottom:15px;}
 .field>span{display:block;font-size:13.5px;font-weight:600;color:var(--ink);margin-bottom:6px;}
@@ -9158,8 +9191,11 @@ body *{visibility:hidden!important;}
 .ca-bar{height:7px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin:7px 0 4px;}
 .ca-bar span{display:block;height:100%;border-radius:99px;}
 .ca-sub{font-size:12px;color:var(--muted);}
-.pub-entry{min-height:44px;display:flex;align-items:center;justify-content:center;gap:7px;width:100%;margin-top:12px;background:none;border:1px dashed var(--line);border-radius:10px;padding:10px 12px;color:var(--muted);font:inherit;font-size:13px;font-weight:600;cursor:pointer;}
-.pub-entry:hover{border-color:var(--primary);color:var(--primary);}
+.pub-entry{min-height:68px;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:11px;width:100%;background:var(--surface);border:1px dashed rgba(31,78,140,.36);border-radius:16px;padding:12px 14px;color:var(--ink);font:inherit;text-align:start;cursor:pointer;box-shadow:var(--control-shadow);}
+.pub-entry:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-soft);}
+.pub-entry-ic{width:42px;height:42px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;background:var(--primary-soft);color:var(--primary);flex-shrink:0;}
+.pub-entry b{display:block;font-size:13.5px;font-weight:800;line-height:1.25;}
+.pub-entry small{display:block;margin-top:2px;font-size:12px;font-weight:600;line-height:1.35;color:var(--muted);overflow-wrap:anywhere;}
 .pub-wrap{position:fixed;inset:0;z-index:60;background:rgba(15,23,42,.55);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px;}
 .pub-card{position:relative;width:100%;max-width:420px;background:var(--surface);border-radius:18px;padding:22px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);animation:cmmsSurfaceIn 220ms var(--ease-out) both;will-change:transform,opacity;}
 .pub-x{position:absolute;inset-inline-end:12px;top:12px;}
