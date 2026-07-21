@@ -40,6 +40,7 @@ import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } fr
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
 import { changeProductionPassword, completeProductionInitialPassword, createProductionAuthStore, loginWithProductionPassword, loginWithProductionPin, logoutProductionSession, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionNotificationReadState, updateProductionProfile, validateProductionInitialPassword } from "./productionLoginAdapter.js";
 import { isOperationallyOverdue } from "./slaModel.js";
+import { DEFAULT_TICKET_SLA_HOURS, resolveTicketSlaHours } from "./ticketSlaPolicyModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 import { findUserDuplicateGroups } from "./userDuplicateModel.js";
 import { createTicketPhotoStorageFromEnv } from "./ticketPhotoStorage.js";
@@ -449,13 +450,8 @@ const RECUR_MS = { weekly: 7 * 86400000, monthly: 30 * 86400000, quarterly: 91 *
 const meetingVisible = (m, session, tasks) => session.role === "admin" || m.ownerId === session.id || (m.participantIds || []).includes(session.id) || (tasks || []).some((t) => (t.meetingId === m.id || (t.linkedMeetingIds || []).includes(m.id)) && (t.ownerId === session.id || (t.responsibleIds || []).includes(session.id)));
 const CAT_META = CATEGORIES.reduce((a, c) => ((a[c.id] = { Icon: c.Icon, color: c.color }), a), {});
 const catMeta = (id) => CAT_META[id] || { Icon: Wrench, color: "#94A3B8" };
-const DEFAULT_SLA = { high: 4, medium: 24, low: 72 };
-const slaForTicket = (t, cfg, fleet) => {
-  if (t.slaHoursOverride) return Number(t.slaHoursOverride);
-  const prio = prOf(t.priority).id;
-  if (t.track === "transport" || t.forkliftId) { const f = (fleet || []).find((x) => x.id === t.forkliftId); return cfg?.typeSla?.[unitTypeName(f, cfg)]?.[prio] ?? cfg?.typeSla?.[unitModelCode(f)]?.[prio] ?? DEFAULT_SLA[prio]; }
-  return cfg?.catSla?.[t.category]?.[prio] ?? DEFAULT_SLA[prio];
-};
+const DEFAULT_SLA = DEFAULT_TICKET_SLA_HOURS;
+const slaForTicket = (t, cfg, fleet) => resolveTicketSlaHours(t, cfg, fleet);
 
 const STATUSES = [
   { id: "pending_manager", label: "ממתינה לאישור מנהל", ...ticketStatusToken("pending_manager") },

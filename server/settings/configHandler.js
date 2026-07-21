@@ -1,13 +1,16 @@
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, normalizeAuditEvent } from "../../src/auditEventModel.js";
 import { APP_CONFIG_ID, APP_CONFIG_KEY, parseAppConfigValue, serializeAppConfigValue } from "../../src/appConfigRecordModel.js";
 import { sendServerError } from "../httpErrors.js";
+import { slaPolicyFieldsChanged, synchronizeOpenTicketSlaWithPolicy } from "../../src/ticketSlaPolicyModel.js";
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
+import { createSupabaseFleetDriverFromEnv } from "../fleet/supabaseFleetDriver.js";
 import { kvReadPermissionError, kvWritePermissionError } from "../kv/permissionPolicy.js";
 import { createSupabaseKvDriverFromEnv } from "../kv/supabaseDriver.js";
 import { bearerToken } from "../session/authCookie.js";
 import { verifyCmmsSessionToken } from "../session/cmmsSessionToken.js";
 import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
 import { createSupabaseAppConfigDriverFromEnv } from "./supabaseAppConfigDriver.js";
+import { createSupabaseTicketsDriverFromEnv } from "../tickets/supabaseTicketsDriver.js";
 import { retiredKvWriteKey } from "../../src/retiredKvWriteModel.js";
 
 const json = (res, status, body) => {
@@ -85,7 +88,7 @@ async function readConfig(configDriver, mirrorDriver) {
   return { config: {}, source: "empty" };
 }
 
-export function createSettingsConfigApiHandler({ configDriver = null, mirrorDriver = null, auditDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
+export function createSettingsConfigApiHandler({ configDriver = null, mirrorDriver = null, auditDriver = null, ticketDriver = null, fleetDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
   const backendConfigDriver = configDriver || createSupabaseAppConfigDriverFromEnv(env, fetchImpl);
   const retiredConfigMirror = retiredKvWriteKey(APP_CONFIG_KEY, {
     dataAuthority: env.CMMS_DATA_AUTHORITY,
@@ -94,6 +97,8 @@ export function createSettingsConfigApiHandler({ configDriver = null, mirrorDriv
   });
   const backendMirrorDriver = retiredConfigMirror ? null : (mirrorDriver || createSupabaseKvDriverFromEnv(env, fetchImpl));
   const backendAuditDriver = auditDriver || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
+  const backendTicketDriver = ticketDriver || createSupabaseTicketsDriverFromEnv(env, fetchImpl);
+  const backendFleetDriver = fleetDriver || createSupabaseFleetDriverFromEnv(env, fetchImpl);
 
   return async function settingsConfigApiHandler(req, res) {
     const auth = await authorize(req, env, fetchImpl, sessionClient);
@@ -125,12 +130,34 @@ export function createSettingsConfigApiHandler({ configDriver = null, mirrorDriv
         return json(res, 200, { ok: true });
       }
 
+      const before = await readConfig(backendConfigDriver, backendMirrorDriver);
       const body = await readBody(req);
       const config = parseAppConfigValue(body?.config ?? body?.value ?? body);
       const record = await backendConfigDriver.upsert(config, APP_CONFIG_ID);
       if (backendMirrorDriver?.set) await backendMirrorDriver.set(APP_CONFIG_KEY, serializeAppConfigValue(record.config), true);
       await writeAuditEvent(backendAuditDriver, configAuditEvent(auth.user, AUDIT_ACTIONS.update, record.config));
-      return json(res, 200, { ok: true, value: serializeAppConfigValue(record.config), config: record.config, source: "normalized" });
+      let slaSync = null;
+      if (backendTicketDriver?.list && backendTicketDriver?.upsert && slaPolicyFieldsChanged(before.config, record.config)) {
+        const [tickets, fleet] = await Promise.all([
+          backendTicketDriver.list({ limit: 1000 }),
+          backendFleetDriver?.list ? backendFleetDriver.list({ limit: 2000 }) : Promise.resolve([])
+        ]);
+        slaSync = await synchronizeOpenTicketSlaWithPolicy({
+          previousConfig: before.config,
+          nextConfig: record.config,
+          tickets,
+          fleet,
+          updateTicket: (ticket) => backendTicketDriver.upsert(ticket)
+        });
+      } else if (backendTicketDriver?.list && backendTicketDriver?.upsert) {
+        slaSync = await synchronizeOpenTicketSlaWithPolicy({
+          previousConfig: before.config,
+          nextConfig: record.config,
+          tickets: [],
+          updateTicket: (ticket) => backendTicketDriver.upsert(ticket)
+        });
+      }
+      return json(res, 200, { ok: true, value: serializeAppConfigValue(record.config), config: record.config, source: "normalized", slaSync });
     } catch (error) {
       if (error instanceof SyntaxError) return json(res, 400, { error: "invalid_json" });
       return sendServerError(req, res, error, { code: "settings_config_api_error", route: "/api/settings/config" });

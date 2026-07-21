@@ -98,6 +98,68 @@ describe("settings config API handler", () => {
     }));
   });
 
+  it("returns SLA sync counts after SLA settings change", async () => {
+    const configDriver = {
+      get: vi.fn().mockResolvedValue({ config: { catSla: { hvac: { high: 4 } } } }),
+      upsert: vi.fn().mockResolvedValue({ config: { catSla: { hvac: { high: 6 } } } })
+    };
+    const ticketDriver = {
+      list: vi.fn().mockResolvedValue([
+        { id: "ticket-1", status: "new", track: "facility", category: "hvac", priority: "high", createdAt: 1_000, dueAt: 1_000 + 4 * 3600000 }
+      ]),
+      upsert: vi.fn().mockResolvedValue(undefined)
+    };
+    const handler = createSettingsConfigApiHandler({
+      configDriver,
+      mirrorDriver: null,
+      ticketDriver,
+      fleetDriver: { list: vi.fn().mockResolvedValue([]) },
+      sessionClient: sessionClientFor({ role: "user", permissions: { settings: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer token" },
+      body: { config: { catSla: { hvac: { high: 6 } } } }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().slaSync).toMatchObject({ checked: 1, updated: 1, skipped: 0, ambiguous: 0, failed: 0, policyChanged: true });
+    expect(ticketDriver.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      id: "ticket-1",
+      dueAt: 1_000 + 6 * 3600000
+    }));
+  });
+
+  it("does not update tickets when non-SLA settings change", async () => {
+    const configDriver = {
+      get: vi.fn().mockResolvedValue({ config: { companyName: "A", catSla: { hvac: { high: 4 } } } }),
+      upsert: vi.fn().mockResolvedValue({ config: { companyName: "B", catSla: { hvac: { high: 4 } } } })
+    };
+    const ticketDriver = {
+      list: vi.fn().mockResolvedValue([{ id: "ticket-1", status: "new", createdAt: 1_000, dueAt: null }]),
+      upsert: vi.fn()
+    };
+    const handler = createSettingsConfigApiHandler({
+      configDriver,
+      mirrorDriver: null,
+      ticketDriver,
+      fleetDriver: { list: vi.fn().mockResolvedValue([]) },
+      sessionClient: sessionClientFor({ role: "user", permissions: { settings: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer token" },
+      body: { config: { companyName: "B", catSla: { hvac: { high: 4 } } } }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().slaSync).toMatchObject({ checked: 0, updated: 0, policyChanged: false });
+    expect(ticketDriver.list).not.toHaveBeenCalled();
+    expect(ticketDriver.upsert).not.toHaveBeenCalled();
+  });
+
   it("writes normalized config without recreating the retired production API mirror", async () => {
     const configDriver = { upsert: vi.fn().mockResolvedValue({ config: { departments: ["Ops"] } }) };
     const mirrorDriver = { set: vi.fn().mockResolvedValue(undefined) };
