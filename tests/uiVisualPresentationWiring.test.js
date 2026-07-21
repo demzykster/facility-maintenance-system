@@ -11,6 +11,12 @@ describe("safe visual presentation wiring", () => {
     expect(appSource).toContain("brandSiteSubtitle(config)");
     expect(appSource).toContain("login-public-panel");
     expect(appSource).toContain("login-toolbar");
+    expect(appSource).toContain("<div className=\"login-bg\" dir={languageDirection(language)}>");
+    expect(appSource).toContain("language-picker-globe");
+    expect(appSource).toContain("language-picker-trigger");
+    expect(appSource).toContain("language-picker-menu");
+    expect(appSource).toContain("grid-template-areas:\"panel visual\"");
+    expect(appSource).not.toContain(".login-bg[dir=\"ltr\"] .login-shell{grid-template-areas:\"panel visual\";}");
     expect(appSource).toContain("pub-entry");
     expect(appSource).toContain("onClick={() => setPub(true)}");
     expect(appSource).not.toContain("QR login");

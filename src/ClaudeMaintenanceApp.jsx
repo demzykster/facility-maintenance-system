@@ -7,7 +7,7 @@ import {
   ShieldCheck, Bell, Check, Moon, Sun, BarChart3, CalendarClock, PenLine, HardHat,
   DollarSign, RefreshCw, Power, Users, UserPlus, ClipboardCheck, ClipboardList,
   FileText, ExternalLink, Gauge, SlidersHorizontal, Copy, Hexagon, MessageSquare,
-  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown, MoreHorizontal, History} from "lucide-react";
+  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown, MoreHorizontal, History, Globe2} from "lucide-react";
 import { AISettingsCard } from "./AISettingsCard.jsx";
 import { InlineAITicketCreate } from "./InlineAITicketCreate.jsx";
 import { UnitPicker } from "./UnitPicker.jsx";
@@ -303,17 +303,18 @@ const PUBLIC_COMPLAINTS = createPublicComplaintClient({ url: publicComplaintApiU
 const PUBLIC_ZONES_URL = publicZonesApiUrlFromEnv(import.meta.env);
 
 function LanguagePicker({ value, onChange, compact = false }) {
-  const current = normalizeLanguageCode(value);
-  return (
-    <label className={`language-picker${compact ? " compact" : ""}`}>
-      {!compact && <span>{uiText(current, "language.label")}</span>}
-      <select value={current} onChange={(e) => onChange(normalizeLanguageCode(e.target.value))}>
-        {languageOptions().map((language) => (
-          <option key={language.code} value={language.code}>{language.nativeName}</option>
-        ))}
-      </select>
-    </label>
-  );
+  const [open, setOpen] = useState(false);
+  const current = normalizeLanguageCode(value), label = `${uiText(current, "language.label")}: ${(languageOptions().find((language) => language.code === current) || languageOptions()[0])?.nativeName || current}`;
+  if (compact) return <div className="language-picker compact" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false); }}>
+      <button type="button" className="language-picker-trigger" title={label} aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((next) => !next)}><Globe2 className="language-picker-globe" size={19} aria-hidden="true" /></button>
+      {open && <div className="language-picker-menu" role="menu" aria-label={uiText(current, "language.label")}>{languageOptions().map((language) => (
+        <button type="button" role="menuitemradio" aria-checked={language.code === current} key={language.code} onMouseDown={(event) => event.preventDefault()} onClick={() => { onChange(normalizeLanguageCode(language.code)); setOpen(false); }}><span>{language.nativeName}</span>{language.code === current && <Check size={15} aria-hidden="true" />}</button>
+      ))}</div>}
+    </div>;
+  return <label className="language-picker" title={label} aria-label={label}>
+      <span>{uiText(current, "language.label")}</span>
+      <select className="language-picker-select" value={current} aria-label={label} onChange={(e) => onChange(normalizeLanguageCode(e.target.value))}>{languageOptions().map((language) => <option key={language.code} value={language.code}>{language.nativeName}</option>)}</select>
+    </label>;
 }
 
 const imageFileToSquareDataUrl = (file, size = 512) => new Promise((resolve, reject) => {
@@ -4291,7 +4292,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
   );
   const brandName = brandCompanyName(config);
   return (
-    <div className="login-bg">
+    <div className="login-bg" dir={languageDirection(language)}>
       <div className="login-shell">
         <div className="login-visual" aria-hidden="true">
           <div className="login-visual-copy">
@@ -8186,23 +8187,22 @@ a{color:inherit;}
 }
 
 .login-bg{min-height:100vh;background:linear-gradient(160deg,#FFFFFF,#E6E7E9);display:flex;align-items:center;justify-content:center;padding:20px;position:relative;overflow-x:hidden;}
-.login-shell{width:min(1060px,100%);display:grid;grid-template-columns:minmax(0,1.08fr) minmax(360px,.92fr);align-items:stretch;background:rgba(255,255,255,.62);border:1px solid rgba(201,205,209,.72);border-radius:28px;box-shadow:0 24px 70px rgba(46,49,56,.18);overflow:hidden;animation:cmmsSurfaceIn 260ms var(--ease-out) both;}
-.login-visual{min-height:620px;background:linear-gradient(90deg,rgba(11,18,27,.78),rgba(11,18,27,.22)),url("/visuals/warehouse-entry.jpg") center/cover no-repeat;display:flex;align-items:flex-end;padding:34px;color:#fff;}
+.login-shell{width:min(1060px,100%);display:grid;grid-template-columns:minmax(0,1.08fr) minmax(360px,.92fr);grid-template-areas:"panel visual";align-items:stretch;background:rgba(255,255,255,.62);border:1px solid rgba(201,205,209,.72);border-radius:28px;box-shadow:0 24px 70px rgba(46,49,56,.18);overflow:hidden;animation:cmmsSurfaceIn 260ms var(--ease-out) both;direction:ltr;}
+.login-visual{grid-area:visual;min-height:620px;background:linear-gradient(90deg,rgba(11,18,27,.78),rgba(11,18,27,.22)),url("/visuals/warehouse-entry.jpg") center/cover no-repeat;display:flex;align-items:flex-end;padding:34px;color:#fff;direction:rtl;}
 .login-visual-copy{max-width:330px;display:flex;flex-direction:column;gap:8px;text-shadow:0 2px 16px rgba(0,0,0,.32);}
 .login-visual-copy span{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.68);}
 .login-visual-copy b{font-family:var(--font-head);font-size:30px;line-height:1.12;font-weight:750;}
-.login-public-panel{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:14px;padding:26px;background:var(--surface);}
+.login-public-panel{grid-area:panel;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:14px;padding:26px;background:var(--surface);}
+.login-bg[dir="rtl"] .login-public-panel{direction:rtl;}.login-bg[dir="ltr"] .login-public-panel{direction:ltr;}
 .login-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:2px;}
 .login-toolbar .language-picker{margin:0;}
 .login-card{background:var(--surface);color:var(--ink);border-radius:20px;padding:26px 22px;width:100%;max-width:none;box-shadow:0 0 0 1px rgba(201,205,209,.64),var(--control-shadow);}
 .login-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px;}
 .login-theme{width:44px;height:44px;border-radius:11px;color:var(--muted);background:var(--surface-2);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .login-theme:hover{border-color:var(--primary);color:var(--primary);}
-.language-picker{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 14px;color:var(--muted);font-size:12px;font-weight:700;}
+.language-picker{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 14px;color:var(--muted);font-size:12px;font-weight:700;}
 .language-picker select{min-height:44px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);padding:0 10px;font:inherit;font-weight:700;}
-.language-picker.compact{margin:0;min-width:82px;}
-.language-picker.compact select{min-height:44px;width:82px;background:var(--surface-2);color:var(--ink);border-color:var(--line);padding:0 7px;}
-.language-picker.compact option{color:#111827;background:#fff;}
+.language-picker.compact{margin:0;width:44px;min-width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;}.language-picker-trigger{width:44px;height:44px;border:1.5px solid var(--line);border-radius:11px;background:var(--surface-2);color:var(--muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--control-shadow);}.language-picker-trigger:hover{border-color:var(--primary);color:var(--primary);}.language-picker-trigger:focus-visible{outline:0;border-color:rgba(31,78,140,.68);box-shadow:0 0 0 3px rgba(31,78,140,.12);}.language-picker-globe{pointer-events:none;}.language-picker-menu{position:absolute;top:calc(100% + 8px);inset-inline-end:0;min-width:146px;padding:6px;border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:0 18px 44px rgba(20,27,37,.18);z-index:40;}.language-picker-menu button{width:100%;min-height:36px;border:0;border-radius:9px;background:transparent;color:var(--ink);display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 10px;font:inherit;font-weight:800;text-align:start;cursor:pointer;}.language-picker-menu button:hover,.language-picker-menu button:focus-visible{outline:0;background:var(--surface-2);color:var(--primary);}
 .brand{display:flex;align-items:center;gap:13px;min-width:0;}
 .brand-mark{position:relative;width:54px;height:54px;border-radius:15px;background:var(--surface);color:var(--ink);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px rgba(46,49,56,.08),0 8px 18px rgba(31,78,140,.10);flex-shrink:0;overflow:hidden;}
 .brand-mark.sm{width:46px;height:46px;border-radius:13px;}
@@ -8244,7 +8244,7 @@ a{color:inherit;}
 @media (min-width:900px){.login-bg{padding:36px;}.login-card{padding:30px 30px 28px;}.login-q{font-size:17px;}}
 @media (max-width:860px){
   .login-bg{align-items:flex-start;padding:0;background:var(--surface);}
-  .login-shell{min-height:100vh;width:100%;border:0;border-radius:0;box-shadow:none;grid-template-columns:1fr;background:var(--surface);}
+  .login-shell{min-height:100vh;width:100%;border:0;border-radius:0;box-shadow:none;grid-template-columns:1fr;grid-template-areas:"visual" "panel";background:var(--surface);}
   .login-visual{min-height:150px;padding:22px;background-position:center 42%;align-items:flex-end;}
   .login-visual-copy b{font-size:21px;}.login-visual-copy span{font-size:10px;}
   .login-public-panel{padding:18px 16px calc(22px + env(safe-area-inset-bottom));justify-content:flex-start;}
@@ -9969,8 +9969,7 @@ body *{visibility:hidden!important;}
   .worker-top .icon-btn{width:44px;height:44px;flex:0 0 44px;}
   .worker-action-btn{width:44px;min-height:44px;padding:0;flex:0 0 44px;justify-content:center;}
   .worker-action-btn span{display:none;}
-  .language-picker.compact{min-width:0;flex:0 0 82px;}
-  .language-picker.compact select{width:100%;min-height:44px;font-size:12px;padding-inline:6px;}
+  .language-picker.compact{min-width:44px;flex:0 0 44px;}
   .wk-title{font-size:18px;}
   .worker-preview{padding:0 12px 10px;}
   .wk-tabs{display:flex;gap:4px;padding:8px 6px 0;align-items:stretch;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;scrollbar-color:var(--line) transparent;}
@@ -10020,7 +10019,7 @@ body *{visibility:hidden!important;}
   .wk-tabs{gap:3px;padding-inline:5px;}
   .wk-tabs button{min-width:64px;flex-basis:64px;min-height:56px;padding:6px 2px;font-size:10.5px;}
   .worker-top .icon-btn,.worker-action-btn{width:44px;height:44px;flex-basis:44px;}
-  .language-picker.compact{flex-basis:76px;}
+  .language-picker.compact{flex-basis:44px;}
 }
 `}</style>);
 }

@@ -88,3 +88,10 @@ Each exception must include:
 - Why necessary: the public entry shell, QR scanner overlay, and shared ticket-card presentation styles still live in `src/ClaudeMaintenanceApp.jsx`; this goal adds a local warehouse visual, responsive/safe-area constraints, focus/alert affordances, and compact card presentation without changing auth, scanner, ticket semantics, SLA, or workflow behavior.
 - Why extraction was not the right move: extracting the login/public-report surface or the shared ticket card would be a broader vertical-slice task than this bounded visual refinement; the goal intentionally leaves existing data contracts, handlers, semantic helpers, and API calls in place.
 - Follow-up/removal condition: when public entry, public cleaning report, and ticket-card surfaces move into dedicated modules/stylesheets, move these presentation rules with those modules and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
+
+- Date: 2026-07-21
+- Owner goal: language picker and public entry warehouse visual refinement.
+- New line count: 10025.
+- Why necessary: the compact public-entry language control and language-direction split-layout rules are still shell-hosted beside the existing login/public cleaning scanner presentation; this bounded UI correction keeps the list of languages behind a globe trigger and flips the visual panel by text direction without touching authentication, scanner behavior, branding data, or ticket workflow.
+- Why extraction was not the right move: extracting the public entry screen would be broader than this owner-requested presentation correction, and the change reuses the existing language model, brand model, and shell stylesheet.
+- Follow-up/removal condition: when the public entry screen moves into a dedicated module/stylesheet, move this language picker and split-layout presentation with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
