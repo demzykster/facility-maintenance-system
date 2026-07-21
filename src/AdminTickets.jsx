@@ -65,7 +65,7 @@ export function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, flee
     if (costF === "with" && !t.closure?.costAmount) return false;
     if (costF === "none" && t.closure?.costAmount) return false;
     if (period !== "all" && t.createdAt < from) return false;
-    if (focus && !ticketMatchesBIFocus(t, { track, focus }, { fleet, zones, config })) return false;
+    if (focus && !ticketMatchesBIFocus(t, { track, focus }, { fleet, zones, config, users })) return false;
     if (q.trim()) { const s = `${ticketNo(t)} ${t.subject} ${t.description} ${t.asset || ""} ${t.assignee || ""} ${t.createdBy?.name}`.toLowerCase(); if (!s.includes(q.toLowerCase())) return false; }
     return true;
   });

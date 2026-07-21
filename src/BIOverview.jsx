@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { BIHeatmapPanel } from "./BIHeatmapPanel.jsx";
 import { BIProblematicTransportPanel } from "./BIProblematicTransportPanel.jsx";
 import { biHeatmapAiPrompt } from "./aiAssistEntryPointModel.js";
+import { nextResponsiblePartyRows } from "./biNextResponsiblePartyModel.js";
 import { BI_PERIOD_OPTIONS } from "./biScopeModel.js";
 import { problematicTransportTicketRows } from "./problematicTransportTicketsModel.js";
 
@@ -169,6 +170,13 @@ export function BIOverview({ session, tickets, fleet, pm, zones, rounds, complai
     now: biNow,
     maxRows: scope.kind === "company" ? 8 : 6
   });
+  const nextResponsibleRows = nextResponsiblePartyRows(openTickets, {
+    fleet: scope.fleet,
+    users: scope.users,
+    waitReasonMeta: (id) => waitReasonLifecycleMeta(config, id),
+    maxRows: scope.kind === "company" ? 8 : 6
+  });
+  const maxNextResponsible = Math.max(1, ...nextResponsibleRows.map((row) => row.n));
   const closedInEvidence = scope.canViewFinancialBI ? scope.tickets.filter((ticket) => ticket.closure && (ticket.closure.signedAt || 0) >= period.evidenceStart) : [];
   const periodCost = closedInEvidence.reduce((sum, ticket) => sum + (ticket.closure.costAmount || 0), 0);
   const avgClosedCost = closedInEvidence.length ? Math.round(periodCost / closedInEvidence.length) : 0;
@@ -402,6 +410,19 @@ export function BIOverview({ session, tickets, fleet, pm, zones, rounds, complai
         formatCost={ils}
         formatDate={fmtDate}
       />
+
+      <section className="panel bi-panel">
+        <div className="bi-panel-head"><div><b>אצל מי השלב הבא</b><span>{nextResponsibleRows.length ? `${nextResponsibleRows.length} גורמים עם קריאות פתוחות` : "אין כרגע קריאות פתוחות לשיוך"}</span></div></div>
+        {nextResponsibleRows.length ? nextResponsibleRows.map((row) => <Bar
+          key={row.key}
+          label={row.label}
+          value={row.n}
+          max={maxNextResponsible}
+          suffix={row.description ? ` · ${row.description}` : ""}
+          color={row.type === "unclear" ? "#B91C1C" : row.type === "transport_supplier_queue" ? "#B45309" : row.type.startsWith("waiting") ? "#D97706" : "var(--primary)"}
+          onClick={() => onGoTickets?.({ st: "open", focus: { label: `BI · השלב הבא · ${row.label}`, nextResponsiblePartyKey: row.key } })}
+        />) : <div className="note">אין כרגע גורם הבא להצגה.</div>}
+      </section>
 
       <section className="panel bi-panel">
         <div className="bi-panel-head"><div><b>סיבות עומס</b><span>מה מסביר את מצב הקריאות</span></div></div>

@@ -84,6 +84,7 @@ import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } f
 import { normalizedTicketAuthorityEnabled, ticketAuthorityFailureIssue, ticketsForAuthority } from "./ticketAuthorityModel.js";
 import { normalizeTransportCreateResponsibility, ticketHolderLabel, transportTechnicianAssignee } from "./ticketResponsibilityModel.js";
 import { ticketListCardSemantics } from "./ticketListSemanticModel.js";
+import { ticketMatchesNextResponsibleParty } from "./biNextResponsiblePartyModel.js";
 import { ticketNextResponsibilityKey } from "./ticketNextResponsibilityModel.js";
 import { waitingReturnReminderEventsForSession } from "./waitingReturnReminderModel.js";
 import { supplierCandidatesForTicket, supplierHasFacilityCategory, supplierHasPpeScope, supplierHasTransportScope, supplierMeta as supMeta, supplierTypeFromMeta } from "./ticketSupplierFilterModel.js";
@@ -4343,7 +4344,7 @@ function UserApp(p) {
   const goNotif = (go, ev) => { setShowNotif(false); if (go === "tickets") { setView("tickets"); } else if (go === "tasks") { setView("tasks"); } else if (go === "team") { setView("dept"); setDeptTab("team"); } else if (go === "cleaning") { setView("dept"); setDeptTab("cleaning"); } else { setView("dept"); setDeptTab("equip"); setDeptNav(ev?.fleetId ? { fleetId: ev.fleetId, _t: Date.now() } : null); } };
   const notif = useNotifications(session, tickets, pm, fleet, config, presence, zones, rounds, complaints, users, [], p.tasks, p.meetings, p.ppeReqs);
   const mine = useMemo(() => visibleTickets(session, tickets, fleet), [tickets, session, fleet]);
-  const ticketRows = useMemo(() => ticketNav ? mine.filter((ticket) => ticketMatchesBIFocus(ticket, ticketNav, { fleet, zones, config })) : mine, [mine, ticketNav, fleet, zones, config]);
+  const ticketRows = useMemo(() => ticketNav ? mine.filter((ticket) => ticketMatchesBIFocus(ticket, ticketNav, { fleet, zones, config, users })) : mine, [mine, ticketNav, fleet, zones, config, users]);
   const myPm = useMemo(() => pmVisible(session, pm, fleet), [pm, fleet, session]);
   const deptWorkers = useMemo(() => { const md = userDepts(session); return (users || []).filter((u) => u.role === "worker" && md.includes(u.dept || "")).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he")); }, [users, session]);
   const pmSoon = useMemo(() => myPm.filter((x) => daysLeft(x.nextDue) <= 7).sort((a, b) => a.nextDue - b.nextDue), [myPm]);
@@ -6875,7 +6876,7 @@ function BIOverview(props) {
     </Suspense>
   );
 }
-function ticketMatchesBIFocus(ticket, nav = {}, { fleet = [], zones = [], config = {} } = {}) {
+function ticketMatchesBIFocus(ticket, nav = {}, { fleet = [], zones = [], config = {}, users = [] } = {}) {
   const focus = nav.focus || {};
   const currentTrack = trackOf(ticket);
   if (nav.track && nav.track !== "all" && currentTrack !== nav.track) return false;
@@ -6884,6 +6885,7 @@ function ticketMatchesBIFocus(ticket, nav = {}, { fleet = [], zones = [], config
   if (focus.supplier && (ticket.closure?.costSupplier || "") !== focus.supplier) return false;
   if (focus.waitReason && ticket.waitingReason !== focus.waitReason) return false;
   if (focus.lifecycleKey && !ticketHasLifecycleStage(ticket, focus.lifecycleKey, { isOpen })) return false;
+  if (focus.nextResponsiblePartyKey && !ticketMatchesNextResponsibleParty(ticket, focus.nextResponsiblePartyKey, { fleet, users, waitReasonMeta: (id) => waitReasonLifecycleMeta(config, id) })) return false;
   if (focus.heatmapMetric && !ticketMatchesBiHeatmapMetric(ticket, focus.heatmapMetric, { isOpenTicket: isOpen, isOverdueTicket: (item) => ticketMissedSla(item, config) })) return false;
   if (focus.assignee && ticket.assignee !== focus.assignee) return false;
   if (focus.minAgeDays != null || focus.maxAgeDays != null) {
