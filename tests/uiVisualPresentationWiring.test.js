@@ -7,8 +7,15 @@ const warehouseAsset = new URL("../public/visuals/warehouse-entry.jpg", import.m
 describe("safe visual presentation wiring", () => {
   it("keeps the public entry screen branded from config and separates cleaning scanner from login", () => {
     expect(appSource).toContain("const brandName = brandCompanyName(config)");
-    expect(appSource).toContain("<div className=\"brand-title\">{brandName}</div>");
-    expect(appSource).toContain("brandSiteSubtitle(config)");
+    expect(appSource).toContain("const brandSubtitle = brandSiteSubtitle(config)");
+    expect(appSource).toContain("<span>{brandName}</span>");
+    expect(appSource).toContain("{brandSubtitle && <b>{brandSubtitle}</b>}");
+    expect(appSource).toContain("login-card-title");
+    expect(appSource).toContain("<div className=\"brand login-title-brand\"><BrandMark logo={config?.brandLogo} /><div className=\"login-card-title\">{t(\"login.title\")}</div></div>");
+    expect(appSource).not.toContain("<div className=\"brand-title\">{brandName}</div>");
+    expect(appSource).toContain("placeholder={identifierActive || identifier ? \"\" : t(\"login.identity\")}");
+    expect(appSource).toContain("aria-label={t(\"login.identity\")}");
+    expect(appSource).toContain(".login-input-wrap{display:flex;align-items:center;gap:9px;direction:ltr;");
     expect(appSource).toContain("login-public-panel");
     expect(appSource).toContain("login-toolbar");
     expect(appSource).toContain("<div className=\"login-bg\" dir={languageDirection(language)}>");

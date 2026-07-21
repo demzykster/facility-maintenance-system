@@ -4035,7 +4035,7 @@ function InstallAppPrompt({ language = DEFAULT_LANGUAGE, companyName = DEFAULT_C
 
 function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language = DEFAULT_LANGUAGE, setLanguage = () => {}, zones, onAnonReport, builtinLogins = [], seedPolicy = SEED_POLICY, productionLoginConfig = PRODUCTION_LOGIN_CONFIG }) {
   const t = (key, vars) => uiText(language, key, vars);
-  const [identifier, setIdentifier] = useState(""), [resolved, setResolved] = useState(null), [password, setPassword] = useState(""), [code, setCode] = useState(""), [err, setErr] = useState(""), [remember, setRemember] = useState(true), [pub, setPub] = useState(false), [busy, setBusy] = useState(false);
+  const [identifier, setIdentifier] = useState(""), [identifierActive, setIdentifierActive] = useState(false), [resolved, setResolved] = useState(null), [password, setPassword] = useState(""), [code, setCode] = useState(""), [err, setErr] = useState(""), [remember, setRemember] = useState(true), [pub, setPub] = useState(false), [busy, setBusy] = useState(false);
   const [skipScanLanding, setSkipScanLanding] = useState(false);
   const [initialSetup, setInitialSetup] = useState(null);
   const [passwordChange, setPasswordChange] = useState(null), [newPassword, setNewPassword] = useState(""), [newPasswordConfirm, setNewPasswordConfirm] = useState("");
@@ -4291,23 +4291,24 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
       : (initialSetup.user?.workerNo || initialSetup.user?.email || initialSetup.identifier || identifier.trim())
   );
   const brandName = brandCompanyName(config);
+  const brandSubtitle = brandSiteSubtitle(config);
   return (
     <div className="login-bg" dir={languageDirection(language)}>
       <div className="login-shell">
         <div className="login-visual" aria-hidden="true">
           <div className="login-visual-copy">
-            <span>Ogen CMMS</span>
-            <b>תפעול שקט למחסן עובד</b>
+            <span>{brandName}</span>
+            {brandSubtitle && <b>{brandSubtitle}</b>}
           </div>
         </div>
         <main className="login-public-panel" aria-label={t("login.title")}>
           <div className="login-toolbar">
             <LanguagePicker value={language} onChange={setLanguage} compact />
             <button type="button" className="login-theme" onClick={toggleTheme} aria-label={theme === "dark" ? "מצב בהיר" : "מצב כהה"}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
-          </div>
+      </div>
       <div className="login-card">
         <div className="login-card-head">
-          <div className="brand"><BrandMark logo={config?.brandLogo} /><div><div className="brand-title">{brandName}</div>{brandSiteSubtitle(config) && <div className="brand-sub">{brandSiteSubtitle(config)}</div>}</div></div>
+          <div className="brand login-title-brand"><BrandMark logo={config?.brandLogo} /><div className="login-card-title">{t("login.title")}</div></div>
         </div>
         {scannedZoneId && !skipScanLanding && !passwordChange && !initialSetup && !resolved ? <ScanPublicLanding zone={scannedLandingZone} invalid={!scannedLandingZone} language={language} onReport={() => setPub(true)} onLogin={() => setSkipScanLanding(true)} /> : passwordChange ? (<>
           <div className="login-q">{t("login.firstPassword")}</div>
@@ -4326,8 +4327,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
           <button className="btn-primary full" onClick={submitInitialSecret} disabled={busy}>{busy ? "שומר…" : "שמירה וכניסה"}</button>
           <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setInitialSetup(null); setNewPassword(""); setNewPasswordConfirm(""); setErr(""); }}>{t("login.back")}</button>
         </>) : !resolved ? (<>
-          <div className="login-q">{t("login.title")}</div>
-          <label className="field login-identity-field"><span>{t("login.identity")}</span><div className="login-input-wrap"><User size={17} aria-hidden="true" /><input className="ltr-input" dir="ltr" value={identifier} onChange={(e) => { setIdentifier(e.target.value); setErr(""); }} autoCapitalize="off" autoComplete="username" name="login-identifier" placeholder="" onKeyDown={(e) => e.key === "Enter" && submitIdentifier()} autoFocus /></div></label>
+          <label className="field login-identity-field"><div className="login-input-wrap"><User size={17} aria-hidden="true" /><input className="ltr-input" dir="ltr" value={identifier} onPointerDown={() => setIdentifierActive(true)} onFocus={() => setIdentifierActive(true)} onBlur={() => setIdentifierActive(false)} onChange={(e) => { setIdentifier(e.target.value); setErr(""); }} autoCapitalize="off" autoComplete="username" name="login-identifier" aria-label={t("login.identity")} placeholder={identifierActive || identifier ? "" : t("login.identity")} onKeyDown={(e) => e.key === "Enter" && submitIdentifier()} /></div></label>
           <label className="chk-line"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> {t("login.remember")}</label>
           {err && <div className="err" role="alert" aria-live="polite">{err}</div>}
           <button type="button" className="btn-primary full" onClick={submitIdentifier} disabled={busy}>{busy ? "בודק…" : t("login.continue")}</button>
@@ -8212,13 +8212,14 @@ a{color:inherit;}
 .brand-mark-core{position:absolute;width:13px;height:13px;border:2px solid var(--primary);border-radius:4px;transform:rotate(30deg);background:var(--surface);}
 .brand-mark.sm .brand-mark-core{width:10px;height:10px;border-width:1.7px;border-radius:3px;}
 .brand-title{font-family:var(--font-head);font-weight:700;font-size:24px;line-height:1;}
+.login-title-brand{align-items:center;}.login-card-title{font-family:var(--font-head);font-weight:700;font-size:22px;line-height:1.15;color:var(--ink);}
 .brand-title.sm{font-size:18px;color:var(--ink);line-height:1.12;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .brand-sub{color:var(--muted);font-size:13px;margin-top:3px;line-height:1.35;overflow-wrap:anywhere;}.brand-sub.sm{color:var(--side-ink);font-size:11.5px;max-width:160px;line-height:1.28;}
 .login-q{font-family:var(--font-head);font-weight:600;font-size:16px;margin:8px 0 14px;}
 .login-identity-field{margin-bottom:13px;}
-.login-input-wrap{display:flex;align-items:center;gap:9px;border:1.5px solid var(--line);border-radius:11px;background:var(--input);padding-inline:12px;color:var(--muted);}
+.login-input-wrap{display:flex;align-items:center;gap:9px;direction:ltr;border:1.5px solid var(--line);border-radius:11px;background:var(--input);padding-inline:12px;color:var(--muted);}
 .login-input-wrap:focus-within{border-color:rgba(31,78,140,.68);box-shadow:0 0 0 3px rgba(31,78,140,.12);}
-.login-input-wrap input{border:0!important;background:transparent!important;padding-inline:0!important;box-shadow:none!important;min-width:0;}
+.login-input-wrap input{border:0!important;background:transparent!important;padding-inline:0!important;box-shadow:none!important;min-width:0;flex:1;}
 .login-users{max-height:48vh;overflow-y:auto;}
 .role-btn{display:flex;align-items:center;gap:12px;width:100%;text-align:right;background:var(--surface-2);border:1.5px solid var(--line);border-radius:14px;padding:13px;margin-bottom:10px;color:var(--ink);}
 .role-btn:hover{border-color:var(--primary);}
