@@ -1192,7 +1192,7 @@ describe("tickets API handler", () => {
         ticketId: "T-2",
         num: 1,
         ticketNo: "F-001",
-        status: "new",
+        status: "pending_manager",
         idempotencyStatus: "created"
       })
     };
@@ -1210,7 +1210,8 @@ describe("tickets API handler", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({ id: "T-2" }), expect.objectContaining({ actorId: "worker-1" }));
+    expect(res.json().ticket).toMatchObject({ id: "T-2", status: "pending_manager" });
+    expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({ id: "T-2", status: "pending_manager" }), expect.objectContaining({ actorId: "worker-1" }));
     expect(sessionClient.getAuthUser).not.toHaveBeenCalled();
   });
 

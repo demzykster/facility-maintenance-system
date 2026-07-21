@@ -128,6 +128,99 @@ describe("ticket create domain", () => {
     });
   });
 
+  it("normalizes worker-created tickets into manager intake and strips routing fields", async () => {
+    const actor = { id: "worker-1", name: "Worker", role: "worker", dept: "Ops" };
+    const driver = {
+      create: vi.fn().mockResolvedValue({
+        ticketId: "ticket-worker-1",
+        num: 12,
+        ticketNo: "F-012",
+        status: "pending_manager",
+        idempotencyStatus: "created"
+      })
+    };
+
+    const result = await createTicketRecord({
+      driver,
+      actor,
+      ticket: {
+        id: "ticket-worker-1",
+        track: "facility",
+        subject: "Leak",
+        description: "Leak near dock",
+        priority: "medium",
+        status: "done",
+        assignee: "Attacker",
+        supplier: "Toyota",
+        routedTech: true,
+        mgrExec: true,
+        waitingReason: "supplier",
+        waitingSupplier: "Vendor",
+        dueAt: 123456,
+        approvedAt: 123
+      },
+      idempotencyKey: "idem-worker-1"
+    });
+
+    const persistedTicket = driver.create.mock.calls[0][0];
+    expect(persistedTicket).toMatchObject({
+      id: "ticket-worker-1",
+      status: "pending_manager",
+      department: "Ops",
+      createdBy: { id: "worker-1", name: "Worker", role: "worker" },
+      reportedBy: { id: "worker-1", name: "Worker", role: "worker" }
+    });
+    expect(persistedTicket.assignee).toBeUndefined();
+    expect(persistedTicket.supplier).toBeUndefined();
+    expect(persistedTicket.routedTech).toBeUndefined();
+    expect(persistedTicket.mgrExec).toBeUndefined();
+    expect(persistedTicket.waitingReason).toBeUndefined();
+    expect(persistedTicket.waitingSupplier).toBeUndefined();
+    expect(persistedTicket.dueAt).toBeUndefined();
+    expect(persistedTicket.approvedAt).toBeUndefined();
+    expect(result.ticket).toMatchObject({ id: "ticket-worker-1", status: "pending_manager" });
+  });
+
+  it("allows worker intake before final facility category classification", async () => {
+    const driver = {
+      create: vi.fn().mockResolvedValue({
+        ticketId: "ticket-worker-facility",
+        num: 13,
+        ticketNo: "F-013",
+        status: "pending_manager",
+        idempotencyStatus: "created"
+      })
+    };
+
+    await expect(createTicketRecord({
+      driver,
+      actor: { id: "worker-1", name: "Worker", role: "worker" },
+      ticket: {
+        id: "ticket-worker-facility",
+        track: "facility",
+        subject: "Door",
+        description: "Door is stuck",
+        priority: "medium"
+      }
+    })).resolves.toMatchObject({ ticket: { status: "pending_manager" } });
+  });
+
+  it("allows worker transport intake before downtime classification but still requires an asset", async () => {
+    const driver = { create: vi.fn() };
+
+    await expect(createTicketRecord({
+      driver,
+      actor: { id: "worker-1", name: "Worker", role: "worker" },
+      ticket: {
+        id: "ticket-worker-transport",
+        track: "transport",
+        subject: "Noise",
+        description: "Noise while turning",
+        priority: "medium"
+      }
+    })).rejects.toThrow("ticket_create_fields_required:forkliftId");
+  });
+
   it("uses replayed authoritative id/number for both action result and returned ticket payload", async () => {
     const driver = {
       create: vi.fn().mockResolvedValue({
