@@ -50,10 +50,46 @@ describe("BI problematic transport panel", () => {
     expect(renderToString(React.createElement(BIProblematicTransportPanel, { ...baseProps, rows: [] }))).toContain("אין קריאות שינוע חריגות להצגה");
   });
 
+  it("renders full-view controls and filtered result counts when expanded", () => {
+    const html = renderToString(React.createElement(BIProblematicTransportPanel, {
+      ...baseProps,
+      rows: baseProps.rows,
+      allRows: [...baseProps.rows, { ...baseProps.rows[0], ticket: { ...baseProps.rows[0].ticket, id: "t-2" } }],
+      filteredRows: baseProps.rows,
+      expanded: true,
+      filters: { period: "30", reason: "all", sort: "priority", query: "" }
+    }));
+
+    expect(html).toContain("סגור");
+    expect(html).toContain("ניתוח מלא של קריאות שינוע חריגות");
+    expect(html).toContain("תקופה");
+    expect(html).toContain("סיבה");
+    expect(html).toContain("מיון");
+    expect(html).toContain("חיפוש לפי קריאה / כלי / מחלקה");
+    expect(html).toMatch(/1(?:<!-- -->)? תוצאות מתוך (?:<!-- -->)?2/);
+  });
+
   it("opens the existing ticket detail contract", () => {
     const onOpenTicket = vi.fn();
     const element = BIProblematicTransportPanel({ ...baseProps, onOpenTicket });
-    const row = React.Children.toArray(element.props.children).find((child) => child?.props?.className === "bi-transport-problem-list");
+    const findProblemRows = (node) => {
+      if (Array.isArray(node)) {
+        for (const child of node) {
+          const found = findProblemRows(child);
+          if (found) return found;
+        }
+        return null;
+      }
+      if (!node || typeof node !== "object") return null;
+      if (node.type?.name === "ProblemRows") return node;
+      for (const child of React.Children.toArray(node.props?.children)) {
+        const found = findProblemRows(child);
+        if (found) return found;
+      }
+      return null;
+    };
+    const problemRows = findProblemRows(element);
+    const row = problemRows.type(problemRows.props);
     const button = React.Children.toArray(row.props.children)[0];
 
     button.props.onClick();

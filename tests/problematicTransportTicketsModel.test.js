@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { biScopeForSession } from "../src/biScopeModel.js";
 import {
+  filterProblematicTransportRows,
   PROBLEMATIC_TRANSPORT_REASON,
   problematicTransportTicketRows
 } from "../src/problematicTransportTicketsModel.js";
@@ -205,5 +206,31 @@ describe("problematic transport tickets model", () => {
       allowedFleetIds: scope.fleet.map((unit) => unit.id),
       now: NOW
     })).toEqual([]);
+  });
+
+  it("filters the full view by period, criterion, query, and sort without changing criteria", () => {
+    const rows = problematicTransportTicketRows([
+      transportTicket({ id: "old-cost", status: "done", downtimeStart: null, closure: { costAmount: 800, signedAt: NOW - 45 * 24 * HOUR } }),
+      transportTicket({ id: "recent-cost", status: "done", downtimeStart: null, asset: "194340", closure: { costAmount: 200, signedAt: NOW - 5 * 24 * HOUR } }),
+      transportTicket({ id: "recent-damage", downtimeStart: null, wearType: "disproportionate", createdAt: NOW - 2 * 24 * HOUR }),
+      transportTicket({ id: "long-downtime", downtimeStart: NOW - 60 * HOUR, createdAt: NOW - HOUR })
+    ], { fleet, now: NOW });
+
+    expect(filterProblematicTransportRows(rows, { now: NOW, period: "30" }).map((row) => row.ticket.id)).toEqual([
+      "recent-damage",
+      "long-downtime",
+      "recent-cost"
+    ]);
+    expect(filterProblematicTransportRows(rows, { now: NOW, period: "all", reason: PROBLEMATIC_TRANSPORT_REASON.CLOSED_WITH_COST }).map((row) => row.ticket.id)).toEqual([
+      "recent-cost",
+      "old-cost"
+    ]);
+    expect(filterProblematicTransportRows(rows, { now: NOW, period: "all", query: "194340" }).map((row) => row.ticket.id)).toEqual([
+      "recent-cost"
+    ]);
+    expect(filterProblematicTransportRows(rows, { now: NOW, period: "all", sort: "cost_desc" }).map((row) => row.ticket.id).slice(0, 2)).toEqual([
+      "old-cost",
+      "recent-cost"
+    ]);
   });
 });

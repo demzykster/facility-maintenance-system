@@ -4,7 +4,7 @@ import { BIProblematicTransportPanel } from "./BIProblematicTransportPanel.jsx";
 import { biHeatmapAiPrompt } from "./aiAssistEntryPointModel.js";
 import { nextResponsiblePartyRows } from "./biNextResponsiblePartyModel.js";
 import { BI_PERIOD_OPTIONS } from "./biScopeModel.js";
-import { problematicTransportTicketRows } from "./problematicTransportTicketsModel.js";
+import { filterProblematicTransportRows, problematicTransportTicketRows } from "./problematicTransportTicketsModel.js";
 
 export function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders, tasks, meetings, config, onOpenTicket, onGoTickets, onGoAssets, onGoCleaning, onGoPpe, onGoTasks, onAskAI, ui = {} }) {
   const {
@@ -67,6 +67,8 @@ export function BIOverview({ session, tickets, fleet, pm, zones, rounds, complai
 
   const [periodId, setPeriodId] = useState("now");
   const [expandedCommandDomain, setExpandedCommandDomain] = useState("");
+  const [transportProblemExpanded, setTransportProblemExpanded] = useState(false);
+  const [transportProblemFilters, setTransportProblemFilters] = useState({ period: "30", reason: "all", sort: "priority", query: "" });
   const period = biPeriodRange(periodId);
   const scope = useMemo(() => biScopeForSession(session, { tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders, tasks, meetings }), [session, tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders, tasks, meetings]);
   const isAdminBI = session?.role === "admin";
@@ -163,12 +165,16 @@ export function BIOverview({ session, tickets, fleet, pm, zones, rounds, complai
     maxRows: scope.kind === "company" ? 8 : 6
   });
   const ticketHeatmapMax = Math.max(1, ...ticketHeatmapRows.flatMap((row) => row.cells.map((cell) => cell.value)));
-  const problematicTransportRows = problematicTransportTicketRows(scope.tickets, {
+  const problematicTransportAllRows = problematicTransportTicketRows(scope.tickets, {
     fleet: scope.fleet,
     zones: scope.zones,
     allowedFleetIds: scope.kind === "department" ? scope.fleet.map((unit) => unit.id) : undefined,
-    now: biNow,
-    maxRows: scope.kind === "company" ? 8 : 6
+    now: biNow
+  });
+  const problematicTransportRows = problematicTransportAllRows.slice(0, scope.kind === "company" ? 8 : 6);
+  const filteredProblematicTransportRows = filterProblematicTransportRows(problematicTransportAllRows, {
+    ...transportProblemFilters,
+    now: biNow
   });
   const nextResponsibleRows = nextResponsiblePartyRows(openTickets, {
     fleet: scope.fleet,
@@ -402,6 +408,12 @@ export function BIOverview({ session, tickets, fleet, pm, zones, rounds, complai
 
       <BIProblematicTransportPanel
         rows={problematicTransportRows}
+        allRows={problematicTransportAllRows}
+        filteredRows={filteredProblematicTransportRows}
+        expanded={transportProblemExpanded}
+        filters={transportProblemFilters}
+        onToggleExpanded={setTransportProblemExpanded}
+        onFilterChange={setTransportProblemFilters}
         onOpenTicket={onOpenTicket}
         ticketNo={ticketNo}
         statusLabel={(status) => stOf(status).label}

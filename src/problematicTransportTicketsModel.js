@@ -9,6 +9,12 @@ export const PROBLEMATIC_TRANSPORT_REASON = Object.freeze({
   CLOSED_WITH_COST: "closed_with_cost"
 });
 
+export const PROBLEMATIC_TRANSPORT_PERIOD = Object.freeze({
+  RECENT_30: "30",
+  RECENT_90: "90",
+  ALL: "all"
+});
+
 const CLOSED_STATUSES = new Set(["done", "closed", "resolved"]);
 
 const finiteTimestamp = (value) => {
@@ -103,4 +109,45 @@ export function problematicTransportTicketRows(tickets = [], options = {}) {
       || (right.downtimeMs || 0) - (left.downtimeMs || 0)
       || (right.displayDate || 0) - (left.displayDate || 0))
     .slice(0, Number.isFinite(options.maxRows) ? Math.max(0, options.maxRows) : undefined);
+}
+
+const rowSearchText = (row = {}) => [
+  row.ticket?.id,
+  row.ticket?.num,
+  row.ticket?.subject,
+  row.ticket?.asset,
+  row.ticket?.supplier,
+  row.unit?.code,
+  row.unit?.name,
+  row.unit?.type,
+  row.departments
+].flat().map((value) => String(value || "").toLowerCase()).join(" ");
+
+export function filterProblematicTransportRows(rows = [], options = {}) {
+  const now = finiteTimestamp(options.now) || Date.now();
+  const period = Object.values(PROBLEMATIC_TRANSPORT_PERIOD).includes(String(options.period || ""))
+    ? String(options.period)
+    : PROBLEMATIC_TRANSPORT_PERIOD.RECENT_30;
+  const reason = String(options.reason || "all");
+  const query = String(options.query || "").trim().toLowerCase();
+  const sort = String(options.sort || "priority");
+  const periodStart = period === PROBLEMATIC_TRANSPORT_PERIOD.ALL
+    ? null
+    : now - Number(period) * 24 * HOUR_MS;
+
+  const filtered = (rows || []).filter((row) => {
+    if (periodStart != null && (!row.displayDate || row.displayDate < periodStart)) return false;
+    if (reason !== "all" && !(row.reasons || []).includes(reason)) return false;
+    if (query && !rowSearchText(row).includes(query)) return false;
+    return true;
+  });
+
+  return [...filtered].sort((left, right) => {
+    if (sort === "date_desc") return (right.displayDate || 0) - (left.displayDate || 0);
+    if (sort === "downtime_desc") return (right.downtimeMs || 0) - (left.downtimeMs || 0);
+    if (sort === "cost_desc") return (right.costAmount || 0) - (left.costAmount || 0);
+    return rowPriority(left) - rowPriority(right)
+      || (right.downtimeMs || 0) - (left.downtimeMs || 0)
+      || (right.displayDate || 0) - (left.displayDate || 0);
+  });
 }
