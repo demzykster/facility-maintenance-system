@@ -7983,7 +7983,7 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
     timeAgo(t.createdAt),
     t.closure ? ils(t.closure.costAmount || 0) : null
   ].filter(Boolean);
-  return (<button className="tcard" onClick={onClick} style={{ borderInlineStartColor: missingHandler ? dangerTone.color : pr.color }}>
+  return (<button type="button" className="tcard" onClick={onClick} aria-label={`${ticketNo(t)} · ${t.subject || "קריאה"}`} style={{ borderInlineStartColor: missingHandler ? dangerTone.color : pr.color }}>
     <div className="tcard-icon" style={{ background: ticketToneForColor(c.color, "accent").bg }}><c.Icon size={20} color={ticketToneForColor(c.color, "accent").color} /></div>
     <div className="tcard-main">
       <div className="tcard-row1"><span className="tcard-subj">{t.subject}</span><span className="tcard-no">#{ticketNo(t)}</span></div>
@@ -7995,7 +7995,7 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
         {semantics.scheduled && <div className="tcard-state tcard-scheduled" style={{ color: adminTone.color }}><CalendarClock size={12} /><span>{semantics.scheduled.label}: <b>{semantics.scheduled.value}</b></span></div>}
         {semantics.sla && <div className="tcard-state tcard-sla"><Clock size={12} /><span>{semantics.sla.label}: <b>{semantics.sla.value}</b></span></div>}
       </div>
-      {isOpen(t) && <SlaBar t={t} config={config} />}
+      {isOpen(t) && <div className="tcard-sla-bar"><SlaBar t={t} config={config} /></div>}
       <div className="tcard-badges">
         {showStatusBadge && <span className="badge sm" style={{ color: statusBadge.color, background: statusBadge.bg }}>{statusBadge.label}</span>}
         {ticketBlocks(t, config) && <span className="badge sm" style={{ color: downtimeTone.color, background: downtimeTone.bg }}><ShieldAlert size={11} /> מושבת</span>}
@@ -8461,6 +8461,28 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .badge{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;}
 .badge.sm{font-size:11.5px;padding:3px 9px;}
 .badge.ovd{color:#8F1D1D;background:#F7EAEA;border-color:#D8B7B7;}
+
+.tcard{position:relative;align-items:flex-start;transition:border-color 150ms var(--ease-out),box-shadow 150ms var(--ease-out),transform 150ms var(--ease-out);}
+.tcard:focus-visible{outline:3px solid rgba(31,78,140,.22);outline-offset:2px;border-color:rgba(31,78,140,.42);}
+.tcard-row1{min-width:0;}
+.tcard-semantics{padding-top:7px;margin-top:7px;border-top:1px solid rgba(201,205,209,.52);}
+.tcard-state{min-width:0;}
+.tcard-state span{line-height:1.35;}
+.tcard-sla-bar{margin-top:7px;}
+.tcard-badges{padding-top:7px;border-top:1px solid rgba(201,205,209,.42);}
+.tcard-badges .badge,.tcard-badges .risk-badge{line-height:1.2;min-height:24px;}
+@media(min-width:760px){
+  .tcard-semantics{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:10px;row-gap:4px;}
+  .tcard-sla{grid-column:1 / -1;}
+}
+@media(max-width:520px){
+  .tcard{gap:10px;padding:12px;}
+  .tcard-icon{width:38px;height:38px;border-radius:10px;}
+  .tcard-row1{align-items:flex-start;}
+  .tcard-subj{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.28;}
+  .tcard-sub{flex-wrap:wrap;white-space:normal;gap:5px 6px;line-height:1.35;}
+  .tcard-badges{gap:5px;}
+}
 
 .sla{margin-top:2px;}
 .sla-track{height:5px;border-radius:999px;background:var(--surface-2);overflow:hidden;}
