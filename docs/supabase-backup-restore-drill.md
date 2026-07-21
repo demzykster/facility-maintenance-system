@@ -1,6 +1,10 @@
 # Supabase Backup And Restore Drill
 
-This is a release gate for the first empty staging/pilot build. It is complete for the current empty staging scope.
+This was the release gate for the first empty staging/pilot build. It remains valid as historical evidence for that initial scope, but it is not proof of current full recovery coverage.
+
+Important limitation: the completed 2026-06-29 evidence did not prove facility-ticket or transport-ticket recovery. Although the drill target included creating tickets, the recorded source snapshot had `cmms_kv_records=0`, and the completed evidence only proved Auth login, `app_users`, `file_metadata`, `audit_events`, the private `cmms-files` bucket, and one restored storage object.
+
+For the current R8 recovery scope, current backup state, RPO/RTO options, and the fresh restore-drill design, see `docs/recovery-readiness-r8.md`.
 
 ## Scope
 
@@ -61,6 +65,6 @@ Completed drill evidence:
 
 ## Pass Criteria
 
-The drill passes only when restored staging can log in and read the restored ticket, file metadata, file bytes, and audit trail.
+The drill passes only when restored staging can log in and read the restored ticket, file metadata, file bytes, and audit trail. The 2026-06-29 historical evidence did not satisfy the restored-ticket part of this target.
 
 If restore succeeds at the database level but the app cannot log in or load files, staging is not ready.
