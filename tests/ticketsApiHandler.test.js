@@ -912,6 +912,91 @@ describe("tickets API handler", () => {
     });
   });
 
+  it("rejects arbitrary status jumps on normalized ticket updates", async () => {
+    const existing = ticketRecord({ id: "F-jump", status: "new", track: "facility" });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn(),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ role: "admin", permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "update",
+        ticket: { ...existing, status: "done" }
+      }
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: "ticket_transition_forbidden:new:done" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("keeps final ticket closure admin-only on normalized updates", async () => {
+    const existing = ticketRecord({ id: "F-admin-close", status: "pending_admin", track: "facility", createdBy: { id: "manager-1", name: "Manager", role: "user", dept: "Ops" } });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn(),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ id: "manager-1", role: "user", name: "Manager", dept: "Ops", departments: ["Ops"], permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "update",
+        ticket: { ...existing, status: "done" }
+      }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "ticket_transition_role_forbidden:user:pending_admin:done" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("allows manager rework to return transport tickets to the accepted technician", async () => {
+    const existing = ticketRecord({ id: "T-rework-return", status: "pending_user", track: "transport", forkliftId: "fork-ops", supplier: "Toyota", assignee: "Sharon", routedTech: true });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn().mockImplementation(async (ticket) => ({ legacy_payload: ticket })),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      fleetDriver: { list: vi.fn().mockResolvedValue([{ id: "fork-ops", depts: ["Ops"], supplier: "Toyota" }]) },
+      sessionClient: sessionClientFor({ id: "manager-1", role: "user", name: "Manager", dept: "Ops", departments: ["Ops"], permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "update",
+        ticket: { ...existing, status: "in_progress", returned: true }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      id: "T-rework-return",
+      status: "in_progress",
+      supplier: "Toyota",
+      assignee: "Sharon",
+      routedTech: true,
+      returned: true
+    }));
+  });
+
   it("updates existing normalized tickets through the old upsert branch when cutover is disabled", async () => {
     const driver = {
       list: vi.fn(),

@@ -16,6 +16,7 @@ import { createSupabaseFleetDriverFromEnv } from "../fleet/supabaseFleetDriver.j
 import { createSupabaseFileMetadataDriverFromEnv } from "../files/supabaseFileMetadataDriver.js";
 import { createSupabaseFileDriverFromEnv } from "../files/supabaseFileDriver.js";
 import { createTicketRecord, createTicketReplayResult, mergeTicketUpdateWithExisting } from "./ticketCreateDomain.js";
+import { ticketLifecycleTransitionError } from "./ticketLifecycleAuthority.js";
 import { ticketServerCreateV2Enabled } from "../../src/ticketServerCreateCutoverModel.js";
 import { canReadTicketInSessionScope, canReadTicketsRole, ticketCreatePermissionError, ticketWritePermissionError, ticketsForSessionReadScope } from "./ticketReadScope.js";
 
@@ -280,6 +281,8 @@ export function createTicketsApiHandler({ driver = null, auditDriver = null, met
         const permissionError = kvWritePermissionError(auth.user, `ticket:${ticket.id}`);
         if (permissionError) return json(res, 403, { error: permissionError });
         const nextTicket = mergeTicketUpdateWithExisting(ticket.legacyPayload, existing);
+        const transitionError = ticketLifecycleTransitionError(auth.user, existing, nextTicket);
+        if (transitionError) return json(res, transitionError.includes("role_forbidden") ? 403 : 409, { error: transitionError });
         const next = normalizeTicketRecord(nextTicket);
         const stored = await backendDriver.upsert(next.legacyPayload);
         const storedTicket = stored?.legacy_payload ? normalizeTicketRecord(stored.legacy_payload).legacyPayload : next.legacyPayload;
