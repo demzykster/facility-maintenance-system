@@ -15,7 +15,7 @@ const Box = ({ children }) => React.createElement("div", null, children);
 const Button = ({ children, label }) => React.createElement("button", null, children || label || "");
 
 const componentNames = [
-  "AlertTriangle", "CalendarClock", "Camera", "CheckCircle2", "ChevronLeft", "Clock", "Copy",
+  "AlertTriangle", "Building2", "CalendarClock", "Camera", "CheckCircle2", "ChevronLeft", "Clock", "Copy",
   "DollarSign", "Gauge", "HardHat", "History", "ListChecks", "MapPin", "Package", "PenLine",
   "Phone", "RefreshCw", "Search", "Send", "ShieldCheck", "Sparkles", "Trash2", "Truck",
   "User", "Wrench", "X"
@@ -310,8 +310,35 @@ describe("ticket detail render smoke", () => {
       }
     });
 
-    expect(html).toContain("יעד המתנה");
+    expect(html).toContain("ממתינים לספק");
     expect(html).toContain("Quote Co");
+    expect(html).not.toContain("יעד המתנה");
+  });
+
+  it("shows facility contractor separately from the internal responsible owner", () => {
+    const html = renderTicket("facility", {
+      ticket: { supplier: "Building Co", assignee: "" }
+    });
+
+    expect(html).toContain("ספק / קבלן");
+    expect(html).toContain("Building Co");
+    expect(html).toContain("אחראי: ");
+    expect(html).toContain("מנהל המערכת");
+  });
+
+  it("shows SLA and a scheduled return as separate detail fields", () => {
+    const html = renderTicket("facility", {
+      ticket: {
+        status: "waiting",
+        waitingReason: "scheduled_date",
+        waitingTargetType: "date",
+        waitingUntil: Date.now() + 172800000
+      }
+    });
+
+    expect(html).toContain("יעד SLA");
+    expect(html).toContain("חזרה לטיפול");
+    expect(html).not.toContain("יעד המתנה");
   });
 
   it("shows only category-relevant suppliers in the facility waiting target", () => {

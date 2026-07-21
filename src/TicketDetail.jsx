@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { closedTicketRecord } from "./ticketClosureModel.js";
 import { deleteTicketAndClose } from "./ticketDeletionModel.js";
 import { ticketResponsibleLabel, transportTicketSupplierName as transportTicketSupplierNameModel } from "./ticketResponsibilityModel.js";
+import { getTicketApprovalContext } from "./ticketListSemanticModel.js";
 import {
   buildTicketWaitingTargetPatch,
   readTicketWaitingTarget,
@@ -34,6 +35,7 @@ const uiObject = (name) => new Proxy({}, {
 });
 
 const AlertTriangle = uiComponent("AlertTriangle");
+const Building2 = uiComponent("Building2");
 const CalendarClock = uiComponent("CalendarClock");
 const Camera = uiComponent("Camera");
 const CheckCircle2 = uiComponent("CheckCircle2");
@@ -354,7 +356,10 @@ export function TicketDetail(p) {
   const facilityAdminProcessingDirty = facilityAdminProcessingHasChanges(ticket, facilityAdminDraft);
   const facilityAdminWaitingValid = !facilityAdminDraft.waitingReason || validateTicketWaitingTargetDraft(facilityAdminDraft.waitingReason, facilityAdminDraft).valid;
   const fixedTransportSupplier = track === "transport" ? transportTicketSupplierName(ticket, p.fleet || []) : "";
-  const responsibleLabel = ticketResponsibleLabel(ticket, { fleet: p.fleet || [] });
+  const responsibleLabel = track === "facility"
+    ? (String(ticket.assignee || "").trim() || "מנהל המערכת")
+    : ticketResponsibleLabel(ticket, { fleet: p.fleet || [] });
+  const approvalContext = getTicketApprovalContext(ticket, { fleet: p.fleet || [], users: p.users || [] });
   const showAdminProcessingPanel = role === "admin" && isOpen(ticket) && !["pending_manager", "pending_user", "rework"].includes(ticket.status);
   const showTransportExecutionToggle = track === "transport" && !["pending_admin", "pending_user"].includes(ticket.status);
   const dtMeta = ticket.downtimeType ? dtOf(ticket.downtimeType) : null;
@@ -413,10 +418,14 @@ export function TicketDetail(p) {
         {requesterPhone && <Meta Icon={Phone} label="טלפון פותח" value={<a className="tel-link" href={`tel:${requesterTel || requesterPhone}`}>{requesterPhone}</a>} />}
         <Meta Icon={Clock} label="נפתח" value={`${fmtDate(ticket.createdAt)} ${fmtTime(ticket.createdAt)}`} />
         {track === "transport" && <Meta Icon={Truck} label="ספק כלי" value={fixedTransportSupplier} />}
+        {track === "facility" && ticket.supplier && <Meta Icon={Building2} label="ספק / קבלן" value={ticket.supplier} />}
         <Meta Icon={Wrench} label="אחראי" value={responsibleLabel} action={isAdmin ? () => setAdminQuickEdit("assignee") : null} />
+        {isOpen(ticket) && <Meta Icon={Clock} label="יעד SLA" value={ticket.dueAt ? `${fmtDate(ticket.dueAt)} ${fmtTime(ticket.dueAt)}` : "לא הוגדר"} />}
         {ticket.wearType && <Meta Icon={Gauge} label="סיווג" value={WEAR.find((x) => x.id === ticket.wearType)?.label} />}
         {ticket.status === "waiting" && ticket.waitingReason && <Meta Icon={CalendarClock} label="סיבת המתנה" value={waitReasonLabel(ticket.waitingReason, config)} />}
-        {ticket.status === "waiting" && waitingTargetLabel && <Meta Icon={CalendarClock} label="יעד המתנה" value={waitingTargetLabel} />}
+        {ticket.status === "waiting" && waitingTargetLabel && waitingTarget.type !== "date" && <Meta Icon={CalendarClock} label={waitingTarget.type === "supplier" ? "ממתינים לספק" : waitingTarget.type === "manager" ? "ממתינים להחלטת מנהל" : "ממתינים ל"} value={waitingTargetLabel} />}
+        {ticket.status === "waiting" && waitingTarget.type === "date" && waitingTargetLabel && <Meta Icon={CalendarClock} label="חזרה לטיפול" value={waitingTargetLabel} />}
+        {approvalContext.isApproval && <Meta Icon={CheckCircle2} label={approvalContext.type === "admin_closure" ? "ממתינה לסגירה" : "ממתינים לאישור"} value={approvalContext.target?.name || "מנהל המחלקה"} />}
         {detailPausedTotal > 0 && <Meta Icon={CalendarClock} label="זמן המתנה (לא נספר ל-SLA)" value={fmtDur(detailPausedTotal)} />}
         {(() => { const r = computeRisk(ticket, p.fleet || [], config); return r.level !== "green" ? <div className="meta"><AlertTriangle size={15} color={r.color} /><div><div className="meta-lbl">רמת סיכון</div><div className="meta-val" style={{ color: r.color, fontWeight: 700 }}>{r.label}</div></div></div> : null; })()}
       </div>
@@ -461,9 +470,9 @@ export function TicketDetail(p) {
           <SectionTitle>תמונת ביצוע (אופציונלי)</SectionTitle>
           <input ref={afterRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(ev) => grabAfter(ev.target.files?.[0])} />
           {afterPhoto ? <div className="photo-prev"><img src={afterPhoto} alt="" /><button className="photo-x" onClick={() => setAfterPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => afterRef.current?.click()}><Camera size={20} /> צירוף תמונת ביצוע</button>}
-          <button className="btn-close full" style={{ marginTop: 14 }} onClick={finishTech}><CheckCircle2 size={16} /> סיום טיפול — העבר לאישור הפותח</button>
+          <button className="btn-close full" style={{ marginTop: 14 }} onClick={finishTech}><CheckCircle2 size={16} /> סיום טיפול — העבר לאישור מנהל</button>
         </>)}
-        {canEditExecutorState && (ticket.status === "pending_user" || ticket.status === "pending_admin") && <div className="banner" style={{ marginTop: 14, background: "#CCFBF1", color: "#0F766E", borderColor: "#5EEAD4" }}><CheckCircle2 size={16} /> הטיפול סומן כהסתיים. הקריאה ממתינה {ticket.status === "pending_user" ? "לאישור הפותח" : "לסגירה ע״י המנהל"}.</div>}
+        {canEditExecutorState && (ticket.status === "pending_user" || ticket.status === "pending_admin") && <div className="banner" style={{ marginTop: 14, background: "#CCFBF1", color: "#0F766E", borderColor: "#5EEAD4" }}><CheckCircle2 size={16} /> הטיפול סומן כהסתיים. הקריאה ממתינה {ticket.status === "pending_user" ? "לאישור מנהל המחלקה" : "לסגירה מנהלית"}.</div>}
       </>)}
 
       {isMgrExec && isOpen(ticket) && (<>
@@ -486,7 +495,7 @@ export function TicketDetail(p) {
 
       {canConfirm && ticket.status === "pending_user" && (<>
         <SectionTitle>אישור ביצוע</SectionTitle>
-        <div className="banner" style={{ marginTop: 8 }}><AlertTriangle size={16} /> הטכנאי דיווח שהתקלה טופלה. נא לאשר או להחזיר לטיפול.</div>
+        <div className="banner" style={{ marginTop: 8 }}><AlertTriangle size={16} /> הטכנאי דיווח שהתקלה טופלה. מנהל המחלקה מתבקש לאשר או להחזיר לטיפול.</div>
         {!returning ? <div style={{ display: "grid", gap: 8, marginTop: 12 }}><button className="btn-close full" onClick={confirmUser}><CheckCircle2 size={16} /> אישור — טופל</button><button className="btn-danger full" onClick={() => { setReturning(true); setNote(""); }}><X size={15} /> הבעיה לא נפתרה</button></div>
           : <><label className="field" style={{ marginTop: 12 }}><span>סיבת ההחזרה (חובה)</span><textarea rows={3} value={note} onChange={(ev) => setNote(ev.target.value)} placeholder="תארו מה עדיין לא תקין…" /></label><div style={{ display: "grid", gap: 8 }}><button className="btn-danger full" onClick={remarksUser} disabled={!note.trim()}>החזרה לטיפול</button><button className="btn-ghost full" onClick={() => { setReturning(false); setNote(""); }}>ביטול</button></div></>}
       </>)}

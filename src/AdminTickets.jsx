@@ -72,6 +72,7 @@ export function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, flee
   const grouped = st === "open";
   const groups = semanticTicketListGroups(list, {
     fleet,
+    users,
     waitReasonMeta: (id) => waitReasonLifecycleMeta(config, id)
   });
   const groupIcons = {
@@ -82,6 +83,10 @@ export function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, flee
     manager: CheckCircle2,
     scheduled: CalendarClock,
     waiting: Clock,
+    approval: CheckCircle2,
+    rework: Wrench,
+    supplierQueue: Wrench,
+    facility: Building2,
     admin: ShieldCheck,
     unassigned: ListChecks
   };

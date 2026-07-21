@@ -458,12 +458,12 @@ const slaForTicket = (t, cfg, fleet) => {
 
 const STATUSES = [
   { id: "pending_manager", label: "ממתינה לאישור מנהל", ...ticketStatusToken("pending_manager") },
-  { id: "rework", label: "הוחזר לעובד", ...ticketStatusToken("rework") },
+  { id: "rework", label: "הוחזרה לתיקון", ...ticketStatusToken("rework") },
   { id: "new", label: "חדשה", ...ticketStatusToken("new") },
   { id: "in_progress", label: "בטיפול", ...ticketStatusToken("in_progress") },
   { id: "waiting", label: "בהמתנה", ...ticketStatusToken("waiting") },
-  { id: "pending_user", label: "ממתינה לאישור הפותח", ...ticketStatusToken("pending_user") },
-  { id: "pending_admin", label: "ממתינה לסגירה", ...ticketStatusToken("pending_admin") },
+  { id: "pending_user", label: "ממתינה לאישור מנהל", ...ticketStatusToken("pending_user") },
+  { id: "pending_admin", label: "ממתינה לסגירה מנהלית", ...ticketStatusToken("pending_admin") },
   { id: "done", label: "נסגרה", ...ticketStatusToken("done") },
   { id: "cancelled", label: "בוטלה", ...ticketStatusToken("cancelled") },
 ];
@@ -7614,6 +7614,7 @@ function TicketForm(p) {
 function ticketDetailUi() {
   return {
     AlertTriangle,
+    Building2,
     CalendarClock,
     Camera,
     CheckCircle2,
@@ -7960,8 +7961,9 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
   const missingHandler = users && t.status !== "waiting" ? needsHandler(t, users, fleet || []) : false;
   const showSubAssignee = admin && t.assignee && !isOpen(t);
   const stateSince = t.updatedAt || t.createdAt;
-  const semantics = ticketListCardSemantics(t, { fleet: fleet || [], waitReasonMeta: (id) => waitReasonLifecycleMeta(config, id), formatDate: fmtDate });
-  const responsibilityTone = semantics.responsibility.mode === "admin_triage" ? ticketTone("info") : semantics.responsibility.mode === "manager_execution" ? ticketTone("success") : semantics.responsibility.mode === "supplier_queue" ? ticketTone("warning") : ticketTone("process");
+  const semantics = ticketListCardSemantics(t, { fleet: fleet || [], users: users || [], waitReasonMeta: (id) => waitReasonLifecycleMeta(config, id), formatDateTime: fmtDateTimeShort });
+  const semanticTone = (tone) => tone === "supplier" ? ticketTone("warning") : tone === "manager" ? ticketTone("success") : tone === "muted" ? ticketTone("neutral") : tone === "info" ? ticketTone("info") : ticketTone("process");
+  const semanticIcon = (kind) => kind === "supplier" || kind === "contractor" ? Building2 : kind === "technician" ? Wrench : kind === "admin_closure" || kind === "manager_approval" ? CheckCircle2 : kind === "sla" || kind === "scheduled" || kind === "waiting" ? CalendarClock : User;
   const unit = t.track === "transport" ? (fleet || []).find((f) => f.id === t.forkliftId || f.code === t.asset) : null;
   const assetLabel = t.track === "transport" ? [unitTypeName(unit, config), unit?.code || t.asset].filter(Boolean).join(" · ") : (t.zone || t.asset || tr?.short);
   const meta = [
@@ -7975,8 +7977,13 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
     <div className="tcard-main">
       <div className="tcard-row1"><span className="tcard-subj">{t.subject}</span><span className="tcard-no">#{ticketNo(t)}</span></div>
       <div className="tcard-sub">{meta.map((x, i) => <React.Fragment key={i}>{i > 0 && <span className="sep">·</span>}{x}</React.Fragment>)}</div>
-      <div className="tcard-state tcard-responsibility" style={{ color: responsibilityTone.color }}><User size={12} /><span>{semantics.responsibility.label}: <b>{semantics.responsibility.value}</b>{isOpen(t) ? <> · {fmtDur(Date.now() - stateSince)}</> : null}</span></div>
-      {semantics.waiting && <div className="tcard-state tcard-waiting" style={{ color: waitTone.color }}><CalendarClock size={12} /><span>{semantics.waiting.label}: <b>{semantics.waiting.value}</b></span></div>}
+      <div className="tcard-semantics">
+        {semantics.executionRows.map((row, index) => { const Icon = semanticIcon(row.kind); const tone = semanticTone(row.tone); return <div key={`${row.kind}-${index}`} className="tcard-state tcard-execution" style={{ color: tone.color }}><Icon size={12} /><span>{row.label}: <b>{row.value}</b>{index === 0 && isOpen(t) ? <> · {fmtDur(Date.now() - stateSince)}</> : null}</span></div>; })}
+        {semantics.waiting && semantics.waiting.kind !== "scheduled" && <div className="tcard-state tcard-waiting" style={{ color: waitTone.color }}><CalendarClock size={12} /><span>{semantics.waiting.label}: <b>{semantics.waiting.value}</b></span></div>}
+        {semantics.approval && (() => { const Icon = semanticIcon(semantics.approval.kind); return <div className="tcard-state tcard-approval" style={{ color: semantics.approval.kind === "admin_closure" ? adminTone.color : ticketTone("success").color }}><Icon size={12} /><span>{semantics.approval.label}: <b>{semantics.approval.value}</b></span></div>; })()}
+        {semantics.scheduled && <div className="tcard-state tcard-scheduled" style={{ color: adminTone.color }}><CalendarClock size={12} /><span>{semantics.scheduled.label}: <b>{semantics.scheduled.value}</b></span></div>}
+        {semantics.sla && <div className="tcard-state tcard-sla"><Clock size={12} /><span>{semantics.sla.label}: <b>{semantics.sla.value}</b></span></div>}
+      </div>
       {isOpen(t) && <SlaBar t={t} config={config} />}
       <div className="tcard-badges">
         {showStatusBadge && <span className="badge sm" style={{ color: statusBadge.color, background: statusBadge.bg }}>{statusBadge.label}</span>}
@@ -8410,10 +8417,13 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .tcard-sub .sep{color:var(--line);flex-shrink:0;}
 .track-tag{display:inline-flex;align-items:center;gap:3px;font-weight:600;min-width:0;max-width:100%;}
 .track-tag span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.tcard-state{display:flex;align-items:center;gap:4px;margin:3px 0 1px;font-size:12px;font-weight:700;}
+.tcard-semantics{display:grid;gap:2px;margin:3px 0 1px;font-family:var(--font-body);font-size:12px;font-weight:700;line-height:normal;letter-spacing:0;}
+.tcard-state{display:flex;align-items:center;gap:4px;margin:0;font:inherit;letter-spacing:0;}
 .tcard-state svg{flex-shrink:0;}
 .tcard-state span{min-width:0;overflow-wrap:anywhere;}
+.tcard-state b{font:inherit;letter-spacing:0;}
 .tcard-waiting{align-items:flex-start;}
+.tcard-sla{color:var(--muted);}
 .tcard-badges{display:flex;align-items:center;justify-content:flex-start;gap:6px;margin-top:7px;flex-wrap:wrap;min-width:0;direction:rtl;}
 .tcard-badges .badge,.tcard-badges .risk-badge{border:1px solid rgba(201,205,209,.72);}
 .tcard-time{margin-inline-start:auto;color:var(--muted);font-size:11.5px;}
