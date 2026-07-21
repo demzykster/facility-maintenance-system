@@ -65,7 +65,8 @@ import { cleaningZoneBlockerCount, cleaningZoneDeleteBlockers, cleaningZoneDelet
 import { appIssueScreenContext, captureAppIssueScreenshot } from "./appIssueScreenshot.js";
 import { canPerformCleaning, canReceiveCleaningComplaints, hasCleaningAccess, isWorkerLike, normalizeCleaningAccess } from "./cleaningAccessModel.js";
 import { defaultWorkerView } from "./workerProfileModel.js";
-import { applyBrandDocumentMetadata, brandCompanyName, brandSiteSubtitle, DEFAULT_COMPANY_NAME, DEFAULT_SITE_SUBTITLE } from "./brandConfigModel.js";
+import { brandCompanyName, brandSiteSubtitle, DEFAULT_COMPANY_NAME, DEFAULT_SITE_SUBTITLE } from "./brandConfigModel.js";
+import { useSiteBranding } from "./publicBrandConfigModel.js";
 import { parseStoredAppConfigValue } from "./appConfigRecordModel.js";
 import { createApiTicketProvider } from "./apiTicketAdapter.js";
 import { createApiFleetProvider } from "./apiFleetAdapter.js";
@@ -1754,7 +1755,7 @@ export default function App() {
   };
   const [rolePreviewRole, setRolePreviewRole] = useState(null);
   const [config, setConfig] = useState(DEFAULT_CONFIG);
-  useEffect(() => { applyBrandDocumentMetadata(config); }, [config.companyName]);
+  useSiteBranding(config, setConfig);
   TASK_STATUS_META = config.taskStatusMeta || {};
   const [users, setUsers] = useState([]);
   const [tickets, setTickets] = useState([]);

@@ -7,7 +7,7 @@ const technicalSource = readFileSync(new URL("../src/stagingSmokePreflightModel.
 
 describe("site branding wiring", () => {
   it("uses the central brand helper across shell and live metadata", () => {
-    expect(appSource).toContain("applyBrandDocumentMetadata(config)");
+    expect(appSource).toContain("useSiteBranding(config, setConfig)");
     expect(appSource).toContain("<TopBar title={brandCompanyName(config)}");
     expect(appSource).toContain("{brandCompanyName(config)} · v{APP_VERSION}");
     expect(appSource).toContain("companyName={brandCompanyName(config)}");
