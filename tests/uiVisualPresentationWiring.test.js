@@ -15,6 +15,9 @@ describe("safe visual presentation wiring", () => {
     expect(appSource).not.toContain("<div className=\"brand-title\">{brandName}</div>");
     expect(appSource).toContain("placeholder={identifierActive || identifier ? \"\" : t(\"login.identity\")}");
     expect(appSource).toContain("aria-label={t(\"login.identity\")}");
+    expect(appSource).toContain("placeholder={secretActive || password ? \"\" : t(\"login.password\")}");
+    expect(appSource).toContain("aria-label={t(\"login.password\")}");
+    expect(appSource).not.toContain("t(\"login.enterPassword\")");
     expect(appSource).toContain(".login-input-wrap{display:flex;align-items:center;gap:9px;direction:ltr;");
     expect(appSource).toContain("remember = true");
     expect(appSource).not.toContain("setRemember");

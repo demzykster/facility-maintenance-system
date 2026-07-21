@@ -4035,7 +4035,7 @@ function InstallAppPrompt({ language = DEFAULT_LANGUAGE, companyName = DEFAULT_C
 
 function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language = DEFAULT_LANGUAGE, setLanguage = () => {}, zones, onAnonReport, builtinLogins = [], seedPolicy = SEED_POLICY, productionLoginConfig = PRODUCTION_LOGIN_CONFIG }) {
   const t = (key, vars) => uiText(language, key, vars);
-  const [identifier, setIdentifier] = useState(""), [identifierActive, setIdentifierActive] = useState(false), [resolved, setResolved] = useState(null), [password, setPassword] = useState(""), [code, setCode] = useState(""), [err, setErr] = useState(""), remember = true, [pub, setPub] = useState(false), [busy, setBusy] = useState(false);
+  const [identifier, setIdentifier] = useState(""), [identifierActive, setIdentifierActive] = useState(false), [secretActive, setSecretActive] = useState(false), [resolved, setResolved] = useState(null), [password, setPassword] = useState(""), [code, setCode] = useState(""), [err, setErr] = useState(""), remember = true, [pub, setPub] = useState(false), [busy, setBusy] = useState(false);
   const [skipScanLanding, setSkipScanLanding] = useState(false);
   const [initialSetup, setInitialSetup] = useState(null);
   const [passwordChange, setPasswordChange] = useState(null), [newPassword, setNewPassword] = useState(""), [newPasswordConfirm, setNewPasswordConfirm] = useState("");
@@ -4332,9 +4332,8 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
           <button type="button" className="btn-primary full" onClick={submitIdentifier} disabled={busy}>{busy ? "בודק…" : t("login.continue")}</button>
         </>) : (<>
           <div className="login-q">{t("login.hello", { name: resolved.user.name })}</div>
-          <div className="hint" style={{ marginBottom: 10 }}>{resolved.identifierType === "email" ? t("login.enterPassword") : t("login.enterPin")}</div>
-          {resolved.auth === "password" ? <label className="field"><span>{t("login.password")}</span><input className="ltr-input" dir="ltr" value={password} onChange={(e) => { setPassword(e.target.value); setErr(""); }} type="password" placeholder="" onKeyDown={(e) => e.key === "Enter" && submitSecret()} autoFocus /></label>
-            : <label className="field"><span>{t("login.pinCode")}</span><input className="ltr-input" dir="ltr" value={code} onChange={(e) => { setCode(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="" onKeyDown={(e) => e.key === "Enter" && submitSecret()} autoFocus /></label>}
+          {resolved.auth === "password" ? <label className="field"><input className="ltr-input" dir="ltr" value={password} onPointerDown={() => setSecretActive(true)} onFocus={() => setSecretActive(true)} onBlur={() => setSecretActive(false)} onChange={(e) => { setPassword(e.target.value); setErr(""); }} type="password" aria-label={t("login.password")} placeholder={secretActive || password ? "" : t("login.password")} onKeyDown={(e) => e.key === "Enter" && submitSecret()} /></label>
+            : <label className="field"><input className="ltr-input" dir="ltr" value={code} onPointerDown={() => setSecretActive(true)} onFocus={() => setSecretActive(true)} onBlur={() => setSecretActive(false)} onChange={(e) => { setCode(e.target.value); setErr(""); }} type="password" inputMode="numeric" aria-label={t("login.pinCode")} placeholder={secretActive || code ? "" : t("login.pinCode")} onKeyDown={(e) => e.key === "Enter" && submitSecret()} /></label>}
           {err && <div className="err" role="alert" aria-live="polite">{err}</div>}
           <button className="btn-primary full" onClick={submitSecret} disabled={busy}>{busy ? t("login.connecting") : t("login.signIn")}</button>
           <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setResolved(null); setPassword(""); setCode(""); setErr(""); }}>{t("login.back")}</button>
