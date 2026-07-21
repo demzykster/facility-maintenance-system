@@ -43,7 +43,7 @@ describe("dynamic app manifest handler", () => {
     }));
 
     expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body)).toMatchObject({ name: "CMMS CDSL", short_name: "CMMS CDSL" });
+    expect(JSON.parse(res.body)).toMatchObject({ name: "עוגן | OGEN", short_name: "עוגן | OGEN" });
   });
 
   it("supports HEAD and rejects other methods", async () => {

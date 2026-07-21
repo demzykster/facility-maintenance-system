@@ -8,7 +8,7 @@ import {
 
 describe("brand config model", () => {
   it("uses default brand text only when no saved site name exists", () => {
-    expect(brandCompanyName({})).toBe("CMMS CDSL");
+    expect(brandCompanyName({})).toBe("עוגן | OGEN");
     expect(brandSiteSubtitle({})).toBe("ניהול אחזקה, צי, ניקיון וביגוד");
   });
 
@@ -56,7 +56,7 @@ describe("brand config model", () => {
 
     applyBrandDocumentMetadata({ companyName: "   " }, documentRef);
 
-    expect(documentRef.title).toBe("CMMS CDSL");
-    expect(meta.setAttribute).toHaveBeenCalledWith("content", "CMMS CDSL");
+    expect(documentRef.title).toBe("עוגן | OGEN");
+    expect(meta.setAttribute).toHaveBeenCalledWith("content", "עוגן | OGEN");
   });
 });

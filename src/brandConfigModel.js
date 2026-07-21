@@ -1,4 +1,4 @@
-export const DEFAULT_COMPANY_NAME = "CMMS CDSL";
+export const DEFAULT_COMPANY_NAME = "עוגן | OGEN";
 export const DEFAULT_SITE_SUBTITLE = "ניהול אחזקה, צי, ניקיון וביגוד";
 export const MAX_BRAND_SHORT_NAME_LENGTH = 24;
 

@@ -19,8 +19,8 @@ describe("app manifest model", () => {
 
   it("uses the centralized fallback for empty company names", () => {
     expect(buildAppManifest({ companyName: "" })).toMatchObject({
-      name: "CMMS CDSL",
-      short_name: "CMMS CDSL"
+      name: "עוגן | OGEN",
+      short_name: "עוגן | OGEN"
     });
   });
 });

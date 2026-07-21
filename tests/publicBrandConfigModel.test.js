@@ -4,7 +4,7 @@ import { fetchPublicBrandManifest, mergePublicBrandConfig } from "../src/publicB
 describe("public brand config model", () => {
   it("hydrates the default login brand from the public manifest", () => {
     expect(mergePublicBrandConfig(
-      { companyName: "CMMS CDSL", siteName: "ניהול אחזקה" },
+      { companyName: "עוגן | OGEN", siteName: "ניהול אחזקה" },
       { name: "עוגן | OGEN" }
     )).toEqual({ companyName: "עוגן | OGEN", siteName: "ניהול אחזקה" });
   });
