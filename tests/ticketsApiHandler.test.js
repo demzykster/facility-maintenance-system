@@ -48,6 +48,7 @@ const ticketRecord = (ticket = {}) => ({
   subject: ticket.subject || "Door",
   description: ticket.description || "Door is stuck",
   category: ticket.category || "doors",
+  priority: ticket.priority || "medium",
   ...ticket
 });
 
@@ -110,7 +111,8 @@ describe("tickets API handler", () => {
         track: "facility",
         subject: "Door",
         description: "Door is stuck",
-        category: "doors"
+        category: "doors",
+        priority: "medium"
       }
     });
 
@@ -158,6 +160,7 @@ describe("tickets API handler", () => {
       subject: "Door",
       description: "Door is stuck",
       category: "doors",
+      priority: "medium",
       status: "new"
     };
     const driver = {
@@ -397,7 +400,7 @@ describe("tickets API handler", () => {
       headers: { authorization: "Bearer user-token", "idempotency-key": "idem-1" },
       body: {
         operation: "create",
-        ticket: { id: "T-idem-retry", track: "facility", subject: "Door", description: "Door is stuck", category: "doors" }
+        ticket: { id: "T-idem-retry", track: "facility", subject: "Door", description: "Door is stuck", category: "doors", priority: "medium" }
       }
     });
 
@@ -430,7 +433,7 @@ describe("tickets API handler", () => {
       headers: { authorization: "Bearer user-token", "idempotency-key": "idem-1" },
       body: {
         operation: "create",
-        ticket: { id: "T-new-id", track: "facility", subject: "Window", description: "Window is stuck", category: "doors" }
+        ticket: { id: "T-new-id", track: "facility", subject: "Window", description: "Window is stuck", category: "doors", priority: "medium" }
       }
     });
 
@@ -542,7 +545,7 @@ describe("tickets API handler", () => {
 
     const res = await call(handler, {
       headers: { authorization: "Bearer user-token" },
-      body: { id: "T-first", track: "transport", subject: "Fan", description: "Fan stopped", category: "transport", forkliftId: "forklift-1", downtimeType: "needs_triage" }
+      body: { id: "T-first", track: "transport", subject: "Fan", description: "Fan stopped", category: "transport", priority: "medium", forkliftId: "forklift-1", downtimeType: "needs_triage" }
     });
 
     expect(res.statusCode).toBe(200);
@@ -565,7 +568,7 @@ describe("tickets API handler", () => {
 
     const res = await call(handler, {
       headers: { authorization: "Bearer user-token" },
-      body: { id: "T-rpc-missing", track: "facility", num: 99, subject: "Door", description: "Door is stuck", category: "doors" }
+      body: { id: "T-rpc-missing", track: "facility", num: 99, subject: "Door", description: "Door is stuck", category: "doors", priority: "medium" }
     });
 
     expect(res.statusCode).toBe(503);
@@ -1131,7 +1134,7 @@ describe("tickets API handler", () => {
 
     const res = await call(handler, {
       headers: { authorization: `Bearer ${token}` },
-      body: { id: "T-2", status: "new", track: "facility", subject: "Worker report", description: "Worker reported an issue", category: "general" }
+      body: { id: "T-2", status: "new", track: "facility", subject: "Worker report", description: "Worker reported an issue", category: "general", priority: "medium" }
     });
 
     expect(res.statusCode).toBe(200);
@@ -1153,7 +1156,7 @@ describe("tickets API handler", () => {
     });
 
     expect(res.statusCode).toBe(400);
-    expect(res.json()).toEqual({ error: "ticket_create_fields_required", fields: ["description", "forkliftId"] });
+    expect(res.json()).toEqual({ error: "ticket_create_fields_required", fields: ["description", "priority", "forkliftId"] });
     expect(driver.create).not.toHaveBeenCalled();
   });
 

@@ -108,6 +108,8 @@ async function smokeOrdinaryTicketCreate(page) {
   await form.locator(".track-pick", { hasText: "מבנה" }).click();
   await form.locator("input").first().fill(SUBJECT);
   await form.locator(".cat-pick").first().click();
+  if (await form.locator(".pr-pick.on").count()) throw new Error("priority_selected_by_default");
+  await form.locator(".pr-pick", { hasText: "בינונית" }).click();
   await form.locator("textarea").first().fill("Local browser smoke creates a demo facility ticket only.");
   await page.getByRole("button", { name: /שליחת הקריאה/ }).click();
   await page.locator(".ovl-inner").waitFor({ state: "detached", timeout: 10000 });

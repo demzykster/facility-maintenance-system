@@ -126,7 +126,7 @@ describe("AI assist handler", () => {
 
     const res = await call(handler, {
       body: inlineTicketBody({
-        text: "Не работает вентилятор на машине 226",
+        text: "Не работает вентилятор на машине 226, приоритет средний",
         idempotencyKey: "idem-226",
         context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
       })
@@ -191,7 +191,7 @@ describe("AI assist handler", () => {
 
     const res = await call(handler, {
       body: {
-        text: "במלגזה 210 הגלגלים שבורים",
+        text: "במלגזה 210 הגלגלים שבורים, עדיפות בינונית",
         idempotencyKey: "idem-inline-210",
         workflow: "ticket_intake",
         context: {
@@ -252,7 +252,7 @@ describe("AI assist handler", () => {
 
     const res = await call(handler, {
       body: inlineTicketBody({
-        text: "מזגן לא עובד בחדר מפעיל מערכת. באזור משרדי הפצה",
+        text: "מזגן לא עובד בחדר מפעיל מערכת. באזור משרדי הפצה. עדיפות בינונית",
         idempotencyKey: "idem-facility",
         module: "facility",
         context: { fleet: [], tickets: [] }
@@ -490,7 +490,7 @@ describe("AI assist handler", () => {
 
     const res = await call(handler, {
       body: inlineTicketBody({
-        text: "מזגן מטפטף אצל בקרי איכות",
+        text: "מזגן מטפטף אצל בקרי איכות, עדיפות בינונית",
         idempotencyKey: "idem-facility-qa",
         context: { tickets: [] }
       })
@@ -975,7 +975,7 @@ describe("AI assist handler", () => {
     const res = await call(handler, {
       headers: { authorization: "Bearer token", "x-request-id": "req-226" },
       body: inlineTicketBody({
-        text: "Не работает вентилятор на машине 226 secret-prompt-fragment",
+        text: "Не работает вентилятор на машине 226, приоритет средний, secret-prompt-fragment",
         idempotencyKey: "idem-226",
         context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] },
         ticket: {
@@ -1044,7 +1044,7 @@ describe("AI assist handler", () => {
       });
       const res = await call(handler, {
         body: inlineTicketBody({
-          text: "Не работает вентилятор на машине 226",
+          text: "Не работает вентилятор на машине 226, приоритет средний",
           idempotencyKey: `idem-${now}`,
           context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] },
           ...body
@@ -1823,7 +1823,7 @@ describe("AI assist handler", () => {
         status: "needs_form_review",
         requiresConfirmation: true,
         writesData: false,
-        missingFields: ["downtimeType"],
+        missingFields: ["priority", "downtimeType"],
         reviewMode: "ticket_form",
         payload: expect.objectContaining({
           track: "transport",
@@ -1839,7 +1839,7 @@ describe("AI assist handler", () => {
       readyActionCount: 0,
       reviewInFormCount: 1,
       actionTypes: ["ticket.create"],
-      missingFields: ["downtimeType"]
+      missingFields: ["priority", "downtimeType"]
     });
     expect(prompt.actionGuidance.instruction).toContain("should be completed in the normal CMMS form");
     expect(prompt.actionGuidance.instruction).toContain("Do not ask a chat follow-up");
@@ -1882,16 +1882,16 @@ describe("AI assist handler", () => {
       expect.objectContaining({
         id: "create_ticket",
         type: "ticket.create",
-        status: "ready_for_confirmation",
+        status: "needs_form_review",
         requiresConfirmation: true,
         writesData: false,
-        missingFields: [],
+        missingFields: ["priority"],
         payload: expect.objectContaining({
           track: "transport",
           forkliftId: "fleet-120823",
           asset: "120823",
           downtimeType: "critical",
-          priority: "high"
+          priority: ""
         })
       })
     ]);
@@ -2720,7 +2720,7 @@ describe("AI assist handler", () => {
       expect.objectContaining({
         type: "ticket.create",
         status: "needs_form_review",
-        missingFields: [],
+        missingFields: ["priority"],
         payload: expect.objectContaining({
           track: "facility",
           zone: "холодильной комнате F-002",
@@ -2740,7 +2740,7 @@ describe("AI assist handler", () => {
       hasActionProposal: true,
       readyActionCount: 0,
       reviewInFormCount: 1,
-      missingFields: []
+      missingFields: ["priority"]
     });
   });
 
@@ -2833,11 +2833,11 @@ describe("AI assist handler", () => {
     expect(payload.actions[0]).toMatchObject({
       type: "ticket.create",
       status: "needs_human_input",
-      missingFields: ["zone"],
+      missingFields: ["priority", "zone"],
       payload: {
         track: "facility",
         category: "hvac",
-        priority: "medium",
+        priority: "",
         zone: ""
       }
     });
@@ -2902,20 +2902,18 @@ describe("AI assist handler", () => {
     const payload = res.json();
     expect(payload.draft.rawText).toBe("מזגן לא עובד בחדר מפעיל מערכת. באזור משרדי הפצה");
     expect(payload.draft.module).toBe("facility");
-    expect(payload.assistant.text).toContain("הכנתי טיוטה לטופס הקריאה.");
-    expect(payload.assistant.text).toContain("קטגוריה: מיזוג אוויר");
-    expect(payload.assistant.text).toContain("מקום: משרדי הפצה");
+    expect(payload.assistant.text).toContain("priority");
     expect(payload.assistant.text).not.toContain("כלי");
     expect(payload.assistant.text).not.toContain("מלגזה");
     expect(payload.assistant.text).not.toContain("תמונה");
     expect(payload.actions[0]).toMatchObject({
       type: "ticket.create",
       status: "needs_form_review",
-      missingFields: [],
+      missingFields: ["priority"],
       payload: {
         track: "facility",
         category: "hvac",
-        priority: "medium",
+        priority: "",
         zone: "משרדי הפצה",
         subject: "מזגן לא עובד בחדר מפעיל מערכת"
       }
@@ -2968,7 +2966,7 @@ describe("AI assist handler", () => {
 
     const ambiguous = await call(handler, {
       body: inlineTicketBody({
-        text: "מזגן לא עובד בחדר מפעיל מערכת. באזור הפצה",
+        text: "מזגן לא עובד בחדר מפעיל מערכת. באזור הפצה. עדיפות בינונית",
         idempotencyKey: "idem-location-ambiguous",
         context: { tickets: [] }
       })
@@ -2983,7 +2981,7 @@ describe("AI assist handler", () => {
         text: "משרדים",
         idempotencyKey: "idem-location-ambiguous",
         messages: [
-          { role: "user", content: "מזגן לא עובד בחדר מפעיל מערכת" },
+          { role: "user", content: "מזגן לא עובד בחדר מפעיל מערכת. עדיפות בינונית" },
           { role: "assistant", content: ambiguous.json().assistant.text },
           { role: "user", content: "משרדים" }
         ],
@@ -3105,9 +3103,9 @@ describe("AI assist handler", () => {
         languageMismatch: false,
         actionCount: 1,
         readyActionCount: 0,
-        missingFieldCount: 0,
+        missingFieldCount: 1,
         actionTypes: ["ticket.create"],
-        missingFields: [],
+        missingFields: ["priority"],
         intakeTelemetry: {
           mergedFromRecentConversation: true,
           recentConversationCount: 3,
@@ -3362,21 +3360,21 @@ describe("AI assist handler", () => {
 
     const first = await call(handler, {
       body: inlineTicketBody({
-        text: "במלגזה 226 תקלה בבדיקה",
+        text: "במלגזה 226 תקלה בבדיקה, עדיפות בינונית",
         idempotencyKey: "inline-rate-a",
         context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
       })
     });
     const replay = await call(handler, {
       body: inlineTicketBody({
-        text: "במלגזה 226 תקלה בבדיקה",
+        text: "במלגזה 226 תקלה בבדיקה, עדיפות בינונית",
         idempotencyKey: "inline-rate-a",
         context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
       })
     });
     const burst = await call(handler, {
       body: inlineTicketBody({
-        text: "במלגזה 226 תקלה נוספת בבדיקה",
+        text: "במלגזה 226 תקלה נוספת בבדיקה, עדיפות בינונית",
         idempotencyKey: "inline-rate-b",
         context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
       })

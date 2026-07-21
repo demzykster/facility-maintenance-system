@@ -67,6 +67,7 @@ const FACILITY_ENTITY_WORDS = Object.freeze([
 
 const EXPLICIT_HIGH_PRIORITY_RE = /(דחוף|מיידי|מסוכן|סכנה|חירום|שריפה|הצפה|עשן|ניצוץ|urgent|critical|danger|fire|flood|smoke)/iu;
 const EXPLICIT_LOW_PRIORITY_RE = /(לא\s+דחוף|נמוך|נמוכה|low\s+priority|not\s+urgent)/iu;
+const EXPLICIT_MEDIUM_PRIORITY_RE = /(בינוני|בינונית|רגיל|רגילה|medium(?:\s+priority)?|normal\s+priority|средн(?:ий|яя|ее)|обычн(?:ый|ая|ое))/iu;
 
 const cleanText = (value, limit = 1000) => String(value || "")
   .replace(/\s+/g, " ")
@@ -488,13 +489,15 @@ function facilityLocationQuestion(text = "") {
   return "באיזה אזור או מחלקה נמצאת התקלה?";
 }
 
-function priorityFromText(text = "", category = "") {
+function priorityFromText(text = "") {
   const raw = cleanText(text, 500);
   if (EXPLICIT_LOW_PRIORITY_RE.test(raw)) return "low";
   if (EXPLICIT_HIGH_PRIORITY_RE.test(raw)) return "high";
-  if (category === "safety") return "high";
-  return "medium";
+  if (EXPLICIT_MEDIUM_PRIORITY_RE.test(raw)) return "medium";
+  return "";
 }
+
+const priorityQuestion = () => "מה העדיפות: גבוהה, בינונית או נמוכה?";
 
 function stripTrailingLocation(subject = "", location = "") {
   const raw = cleanText(subject, MAX_DESCRIPTION_CHARS);
@@ -525,7 +528,7 @@ function assetDisplay(asset = {}) {
   return cleanText(asset.code || asset.num || asset.number || asset.asset || asset.unitCode || asset.workerNo || asset.vehicleNumber || asset.licensePlate || asset.displayNumber || asset.id, 160);
 }
 
-function buildTransportTicket({ text = "", asset = {}, user = {}, now = Date.now(), ticketId = "" } = {}) {
+function buildTransportTicket({ text = "", asset = {}, priority = "", user = {}, now = Date.now(), ticketId = "" } = {}) {
   const actor = actorTicketPayload(user);
   const subject = compactSubject(text) || "תקלה בכלי שינוע";
   const department = cleanText(asset.department || asset.dept || actorDepartment(user), 120);
@@ -535,7 +538,7 @@ function buildTransportTicket({ text = "", asset = {}, user = {}, now = Date.now
     subject,
     category: "transport",
     categoryLabel: "",
-    priority: SYSTEM_DOWNTIME_NEEDS_TRIAGE.prio,
+    priority: cleanText(priority, 40),
     zone: "",
     asset: assetDisplay(asset),
     forkliftId: cleanText(asset.id, 160),
@@ -572,18 +575,18 @@ function buildTransportTicket({ text = "", asset = {}, user = {}, now = Date.now
   };
 }
 
-function buildFacilityTicket({ text = "", baseText = "", category = {}, location = "", user = {}, now = Date.now(), ticketId = "" } = {}) {
+function buildFacilityTicket({ text = "", baseText = "", category = {}, location = "", priority = "", user = {}, now = Date.now(), ticketId = "" } = {}) {
   const actor = actorTicketPayload(user);
   const sourceText = cleanText(baseText || text, MAX_DESCRIPTION_CHARS);
   const subject = compactSubject(stripTrailingLocation(sourceText, location)) || "תקלה באחזקת מבנה ומתקנים";
-  const priority = priorityFromText(sourceText, category.id);
+  const selectedPriority = cleanText(priority, 40);
   return {
     id: cleanText(ticketId, 160),
     track: "facility",
     subject,
     category: cleanText(category.id, 80),
     categoryLabel: cleanText(category.label, 120),
-    priority,
+    priority: selectedPriority,
     zone: cleanText(location, 160),
     asset: "",
     forkliftId: null,
@@ -600,7 +603,7 @@ function buildFacilityTicket({ text = "", baseText = "", category = {}, location
     createdBy: actor,
     createdAt: now,
     updatedAt: now,
-    dueAt: now + (priority === "high" ? 4 : priority === "low" ? 72 : 24) * HOUR,
+    dueAt: now + (selectedPriority === "high" ? 4 : selectedPriority === "low" ? 72 : 24) * HOUR,
     ai: {
       source: "inline_ai_ticket_intake",
       autonomous: true,
@@ -700,6 +703,61 @@ export function buildInlineTicketIntakePlan({
   const previous = normalizeInlineTicketIntakeSession(previousIntake);
   const baseText = cleanText(previous?.draft?.subject || previous?.originalMessage || rawText, MAX_DESCRIPTION_CHARS);
   const fleet = visibleFleet(context, fullVisibleFleet);
+  const pendingPriority = previous?.pendingField === "priority";
+  if (pendingPriority) {
+    const priority = priorityFromText(latest);
+    if (!priority) {
+      return collectingPlan({
+        domain: previous.domain,
+        pendingField: "priority",
+        question: priorityQuestion(),
+        unknowns: ["priority"],
+        draft: previous.draft,
+        originalMessage: previous.originalMessage
+      });
+    }
+    if (previous.domain === "transport") {
+      const asset = fleet.find((item) => cleanText(item.id, 160) === previous.draft.forkliftId) || {
+        id: previous.draft.forkliftId,
+        code: previous.draft.asset
+      };
+      const ticket = buildTransportTicket({
+        text: previous.originalMessage || previous.draft.description,
+        asset,
+        priority,
+        user,
+        now,
+        ticketId
+      });
+      return readyPlan({
+        domain: "transport",
+        ticket,
+        facts: [{ domain: "transport", assetId: ticket.forkliftId, assetCode: ticket.asset }]
+      });
+    }
+    if (previous.domain === "facility") {
+      const category = facilityCategories(config).find((item) => item.id === previous.draft.category);
+      if (category && previous.draft.zone) {
+        const ticket = buildFacilityTicket({
+          text: previous.originalMessage || previous.draft.description,
+          baseText: previous.originalMessage || previous.draft.description,
+          category,
+          location: previous.draft.zone,
+          priority,
+          user,
+          now,
+          ticketId
+        });
+        return readyPlan({
+          domain: "facility",
+          ticket,
+          facts: [{ domain: "facility", location: ticket.zone, category: ticket.category, categoryLabel: ticket.categoryLabel }]
+        });
+      }
+    }
+  }
+  const carriedPriority = ["high", "medium", "low"].includes(previous?.draft?.priority) ? previous.draft.priority : "";
+  const selectedPriority = priorityFromText(previous?.originalMessage || rawText) || priorityFromText(latest) || carriedPriority;
   const pendingTransport = previous?.domain === "transport" && previous.pendingField === "asset";
   const pendingFacilityLocation = previous?.domain === "facility" && previous.pendingField === "location";
   const assetSearchText = pendingTransport ? latest : rawText;
@@ -715,13 +773,26 @@ export function buildInlineTicketIntakePlan({
 
   if (transportEntity) {
     if (assetResult.status === "matched") {
+      const priority = selectedPriority;
       const ticket = buildTransportTicket({
         text: baseText || rawText,
         asset: assetResult.asset,
+        priority,
         user,
         now,
         ticketId
       });
+      if (!priority) {
+        return collectingPlan({
+          domain: "transport",
+          pendingField: "priority",
+          question: priorityQuestion(),
+          unknowns: ["priority"],
+          facts: [{ domain: "transport", assetId: ticket.forkliftId, assetCode: ticket.asset }],
+          draft: ticket,
+          originalMessage: previous?.originalMessage || rawText
+        });
+      }
       return readyPlan({
         domain: "transport",
         ticket,
@@ -737,7 +808,7 @@ export function buildInlineTicketIntakePlan({
       subject: compactSubject(baseText || rawText) || "תקלה בכלי שינוע",
       description: cleanText(baseText || rawText, MAX_DESCRIPTION_CHARS),
       category: "transport",
-      priority: SYSTEM_DOWNTIME_NEEDS_TRIAGE.prio,
+      priority: selectedPriority,
       downtimeType: SYSTEM_DOWNTIME_NEEDS_TRIAGE.id
     };
     if (assetResult.status === "ambiguous") {
@@ -784,7 +855,7 @@ export function buildInlineTicketIntakePlan({
           track: "facility",
           subject: compactSubject(baseText || rawText),
           description: cleanText(baseText || rawText, MAX_DESCRIPTION_CHARS),
-          priority: "medium"
+          priority: selectedPriority
         },
         originalMessage: baseText || rawText
       });
@@ -799,7 +870,7 @@ export function buildInlineTicketIntakePlan({
           track: "facility",
           subject: compactSubject(baseText || rawText),
           description: cleanText(baseText || rawText, MAX_DESCRIPTION_CHARS),
-          priority: "medium"
+          priority: selectedPriority
         },
         originalMessage: baseText || rawText
       });
@@ -815,7 +886,7 @@ export function buildInlineTicketIntakePlan({
           track: "facility",
           subject: compactSubject(baseText || rawText),
           description: cleanText(baseText || rawText, MAX_DESCRIPTION_CHARS),
-          priority: "medium"
+          priority: selectedPriority
         },
         originalMessage: baseText || rawText
       });
@@ -832,7 +903,7 @@ export function buildInlineTicketIntakePlan({
           description: facilityDescriptionFromText(baseText || rawText, resolvedCategory.id, ""),
           category: resolvedCategory.id,
           categoryLabel: resolvedCategory.label,
-          priority: priorityFromText(baseText || rawText, resolvedCategory.id)
+          priority: selectedPriority
         },
         originalMessage: baseText || rawText
       });
@@ -858,15 +929,28 @@ export function buildInlineTicketIntakePlan({
       description: facilityDescriptionFromText(baseText || rawText, resolvedCategory.id, locationResult.location || ""),
       category: resolvedCategory.id,
       categoryLabel: resolvedCategory.label,
-      priority: priorityFromText(baseText || rawText, resolvedCategory.id),
+      priority: selectedPriority,
       zone: locationResult.location || ""
     };
     if (locationResult.status === "matched") {
+      const priority = selectedPriority;
+      if (!priority) {
+        return collectingPlan({
+          domain: "facility",
+          pendingField: "priority",
+          question: priorityQuestion(),
+          unknowns: ["priority"],
+          facts: [{ domain: "facility", location: locationResult.location, category: resolvedCategory.id, categoryLabel: resolvedCategory.label }],
+          draft: draftBase,
+          originalMessage: previous?.originalMessage || rawText
+        });
+      }
       const ticket = buildFacilityTicket({
         text: rawText,
         baseText: baseText || rawText,
         category: resolvedCategory,
         location: locationResult.location,
+        priority,
         user,
         now,
         ticketId
@@ -950,7 +1034,7 @@ export function buildInlineTicketIntakePlan({
     draft: {
       subject: compactSubject(rawText),
       description: rawText,
-      priority: "medium"
+      priority: selectedPriority
     },
     originalMessage: rawText
   });

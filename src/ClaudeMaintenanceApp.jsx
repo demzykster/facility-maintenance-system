@@ -7389,7 +7389,7 @@ function TicketForm(p) {
   const [track, setTrack] = useState(prefill?.track || null);
   const [subject, setSubject] = useState(prefill?.subject || "");
   const [category, setCategory] = useState(prefill?.category || "");
-  const [priority, setPriority] = useState(prefill?.priority || "medium");
+  const [priority, setPriority] = useState(prefill?.priority || "");
   const [zone, setZone] = useState(prefill?.zone || config.zones[0]);
   const [asset, setAsset] = useState(prefill?.asset || "");
   const [forkliftId, setForkliftId] = useState(prefill?.forkliftId || "");
@@ -7425,7 +7425,7 @@ function TicketForm(p) {
   const applyAiTicketPrefill = (draft = {}) => {
     setSubject(draft.subject || "");
     setCategory(draft.category || "");
-    setPriority(draft.priority || "medium");
+    setPriority(draft.priority || "");
     setZone(draft.zone || config.zones[0]);
     setAsset(draft.asset || "");
     setForkliftId(draft.forkliftId || "");
@@ -7449,7 +7449,7 @@ function TicketForm(p) {
     const text = `${subject}\n${description}`.trim(); if (!text && !photo) { setErr("כתבו נושא/תיאור או צרפו תמונה"); return; }
     setAiBusy(true); setErr(""); const local = localSuggest(text || "");
     try {
-      const sys = `אתה עוזר אחזקה במרכז לוגיסטי. נתח את התקלה (טקסט ותמונה אם צורפה) והחזר JSON בלבד, ללא טקסט נוסף וללא Markdown: {"category":"<id>","priority":"<id>","description":"<תיאור משופר וברור של התקלה בעברית>"}. קטגוריות אפשריות: ${(config.categories || CATEGORIES).map((c) => c.id + "=" + c.label).join(", ")}. עדיפויות: high=דחוף/מסוכן, medium=רגיל, low=זניח.`;
+      const sys = `אתה עוזר אחזקה במרכז לוגיסטי. נתח את התקלה (טקסט ותמונה אם צורפה) והחזר JSON בלבד, ללא טקסט נוסף וללא Markdown: {"category":"<id>","description":"<תיאור משופר וברור של התקלה בעברית>"}. קטגוריות אפשריות: ${(config.categories || CATEGORIES).map((c) => c.id + "=" + c.label).join(", ")}.`;
       const content = [];
       if (photo) { const m = /^data:(image\/[a-z]+);base64,(.+)$/i.exec(photo); if (m) content.push({ type: "image", source: { type: "base64", media_type: m[1], data: m[2] } }); }
       content.push({ type: "text", text: `נושא: ${subject || "(לא צויין)"}\nתיאור: ${description || "(ראה תמונה)"}` });
@@ -7459,13 +7459,11 @@ function TicketForm(p) {
       const j = JSON.parse(match[0]);
       const cats = config.categories || CATEGORIES;
       if (cats.some((c) => c.id === j.category)) setCategory(j.category); else if (local.category && cats.some((c) => c.id === local.category)) setCategory(local.category);
-      setPriority(["high", "medium", "low"].includes(j.priority) ? j.priority : local.priority);
       if (j.description && j.description.trim().length > description.length) setDescription(j.description.trim());
       setAiNote(photo ? "ה-AI ניתח את התמונה והתיאור ✨ — בדקו ואשרו" : "הצעת AI הוחלה ✨ — בדקו ואשרו");
     } catch (e) {
       const cats = config.categories || CATEGORIES;
       if (local.category && cats.some((c) => c.id === local.category)) setCategory(local.category);
-      setPriority(local.priority);
       setAiNote("שירות ה-AI אינו זמין כעת — הוחלה הצעה לפי מילות מפתח. ניתן לערוך ידנית.");
     }
     finally { setAiBusy(false); setTimeout(() => setAiNote(""), 5000); }
@@ -7477,7 +7475,7 @@ function TicketForm(p) {
     const status = retroOn ? (retro.status || "new") : "new";
     const closedAt = retroOn ? datetimeValueToMs(retro.closedAt, datetimeValueToMs(retro.updatedAt, now)) : null;
     const updatedAt = retroOn ? datetimeValueToMs(retro.updatedAt, closedAt || now) : now;
-    const pr = track === "transport" ? dtOf(downtimeType, config).prio : priority;
+    const pr = priority;
     const hrs = (isAdmin && slaOn) ? (Number(slaH) || DEFAULT_SLA[pr]) : slaForTicket({ track, forkliftId, category, priority: pr }, config, ticketFleet);
     const dueAt = retroOn ? datetimeValueToMs(retro.dueAt, createdAt + hrs * 3600000) : createdAt + hrs * 3600000;
     const selectedFleet = track === "transport" ? ticketFleet.find((f) => f.id === forkliftId) : null;
@@ -7514,11 +7512,12 @@ function TicketForm(p) {
   };
   const submit = async () => {
     if (busyRef.current) return;
-    const missing = missingTicketCreateFields({ track, subject, description, category, forkliftId, downtimeType });
+    const missing = missingTicketCreateFields({ track, subject, description, category, priority, forkliftId, downtimeType });
     if (!subject.trim()) return setErr("נא להזין נושא");
     if (track === "facility" && !category) return setErr("נא לבחור קטגוריה");
     if (track === "transport" && !forkliftId) return setErr("נא לבחור כלי שינוע");
     if (track === "transport" && !downtimeType) return setErr("נא לבחור מצב הכלי");
+    if (!priority) return setErr("נא לבחור עדיפות");
     if (!description.trim()) return setErr("נא לתאר את התקלה");
     if (missing.length) return setErr("נא להשלים את שדות החובה");
     setErr("");
@@ -7563,10 +7562,10 @@ function TicketForm(p) {
         <div className="field"><span>מצב הכלי *</span><div className="dt-list">{dtLevels(config).map((d) => <button key={d.id} className={"dt-pick" + (downtimeType === d.id ? " on" : "")} onClick={() => setDowntimeType(d.id)} style={downtimeType === d.id ? { borderColor: d.color, background: d.color + "14" } : {}}><span className="dt-dot" style={{ background: d.color }} /><div><div className="dt-name">{d.label}{d.oos ? " · מושבת" : ""}</div><div className="dt-desc">{d.desc}</div></div></button>)}</div></div>
       </>) : (<>
         <div className="field"><span>קטגוריה *</span><div className="cat-grid">{(config.categories || CATEGORIES).map((c) => { const m = catMeta(c.id); return <button key={c.id} className={"cat-pick" + (category === c.id ? " on" : "")} onClick={() => setCategory(c.id)} style={category === c.id ? { borderColor: m.color, background: m.color + "1f" } : {}}><m.Icon size={19} color={m.color} /><span>{c.label}</span></button>; })}</div></div>
-        <div className="field"><span>עדיפות *</span><div className="pr-row">{PRIORITIES.map((x) => <button key={x.id} className={"pr-pick" + (priority === x.id ? " on" : "")} onClick={() => setPriority(x.id)} style={priority === x.id ? { background: x.color, color: "#fff", borderColor: x.color } : {}}>{x.label}</button>)}</div></div>
         <label className="field"><span>אזור</span><select value={facilityZone} onChange={(e) => setZone(e.target.value)}>{facilityZoneOptions.map((z) => <option key={z}>{z}</option>)}</select>{managerMaintZones.length > 0 && <div className="hint">מוצגים רק אזורי האחריות שלך.</div>}</label>
         <label className="field"><span>ציוד (אופציונלי)</span><input value={asset} onChange={(e) => setAsset(e.target.value)} /></label>
       </>)}
+      <div className="field"><span>עדיפות *</span><div className="pr-row">{PRIORITIES.map((x) => <button key={x.id} className={"pr-pick" + (priority === x.id ? " on" : "")} onClick={() => setPriority(x.id)} style={priority === x.id ? { background: x.color, color: "#fff", borderColor: x.color } : {}}>{x.label}</button>)}</div></div>
       <label className="field"><span>תיאור התקלה *</span><textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} /></label>
       {track === "transport" && forkliftId && (() => { const fk = ticketFleet.find((f) => f.id === forkliftId); return eligibleTechs({ track: "transport", forkliftId, supplier: fk?.supplier || "" }, users, fleet).length === 0; })() && <div className="note" style={{ borderColor: "#FCA5A5", color: "#B91C1C", background: "#FEF2F2", marginTop: 0 }}><AlertTriangle size={13} /> אין כרגע טכנאי שינוע פעיל שיכול לקבל קריאה זו. אפשר להמשיך — הקריאה תסומן «ללא מטפל» ומנהל המערכת יקבל התראה לשיבוץ ידני.</div>}
       {isAdmin && <div className="admin-route">

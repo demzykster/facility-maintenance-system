@@ -21,7 +21,7 @@ export const TICKET_CREATE_FIELD_CONTRACT = Object.freeze({
   subject: Object.freeze(["required_blocking", "inferable"]),
   description: Object.freeze(["required_blocking", "inferable"]),
   category: Object.freeze(["required_blocking", "defaulted", "inferable"]),
-  priority: Object.freeze(["defaulted", "inferable", "safety_relevant"]),
+  priority: Object.freeze(["required_blocking", "safety_relevant"]),
   asset: Object.freeze(["optional", "inferable"]),
   forkliftId: Object.freeze(["required_blocking", "inferable", "safety_relevant"]),
   zone: Object.freeze(["defaulted", "optional"]),
@@ -75,6 +75,7 @@ export function missingTicketCreateFields(input = {}) {
   const missing = [];
   if (!cleanText(ticket.subject || ticket.title, 240)) missing.push("subject");
   if (!cleanText(ticket.description || ticket.desc, 1600)) missing.push("description");
+  if (!cleanText(ticket.priority, 40)) missing.push("priority");
   if (track === TICKET_TRACKS.facility && !cleanText(ticket.category || ticket.cat, 120)) missing.push("category");
   if (track === TICKET_TRACKS.transport && !cleanText(ticket.forkliftId || ticket.forklift_id, 160)) missing.push("forkliftId");
   if (track === TICKET_TRACKS.transport && !cleanText(ticket.downtimeType || ticket.downtime_type, 80)) missing.push("downtimeType");

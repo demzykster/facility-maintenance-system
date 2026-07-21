@@ -36,7 +36,7 @@ async function execute(text, options = {}) {
     fullVisibleFleet: options.fullVisibleFleet || [],
     rawContext: options.rawContext || { uiSurface: "inline_ticket_create", taskSession: { type: "ticket_intake", transient: true } },
     text,
-    latestText: options.latestText || text,
+    latestText: options.latestText || "בינונית",
     intake: options.intake || null,
     config: options.config || defaultConfig,
     module: options.module || "transport",
@@ -47,6 +47,19 @@ async function execute(text, options = {}) {
 }
 
 describe("AI ticket.create capability", () => {
+  it("blocks autonomous create until priority is explicit", async () => {
+    const text = "Не работает вентилятор на машине 226";
+    const { result, driver } = await execute(text, { latestText: text });
+
+    expect(result).toMatchObject({
+      executionStatus: "blocked",
+      unknowns: ["priority"],
+      blockingQuestion: "מה העדיפות: גבוהה, בינונית או נמוכה?",
+      intake: { domain: "transport", pendingField: "priority", draft: { priority: "" } }
+    });
+    expect(driver.create).not.toHaveBeenCalled();
+  });
+
   it("creates a simple transport ticket without extra duplicate lookup or diagnosis", async () => {
     const { result, driver } = await execute("Не работает вентилятор на машине 226");
 

@@ -82,7 +82,8 @@ describe("ticket create domain", () => {
         track: "facility",
         subject: "Door",
         description: "Door is stuck",
-        category: "doors"
+        category: "doors",
+        priority: "medium"
       },
       idempotencyKey: "idem-1"
     });
@@ -113,7 +114,8 @@ describe("ticket create domain", () => {
         track: "facility",
         subject: "Door",
         description: "Door is stuck",
-        category: "doors"
+        category: "doors",
+        priority: "medium"
       }, actor), actor)
     });
     expect(result.ticket).toMatchObject({

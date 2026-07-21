@@ -124,7 +124,7 @@ export function canExecuteAiAssistAction(action = {}) {
     return hasAiMemoryApiExecuteContract(action) && !!cleanText(payload.summary, 280);
   }
   if (!hasTicketsApiExecuteContract(action)) return false;
-  if (action.type === "ticket.create") return true;
+  if (action.type === "ticket.create") return !!cleanText(payload.priority, 40);
   if (action.type === "ticket.update") {
     return !!cleanText(payload.ticketId, 160)
       && !!payload.patch
@@ -566,7 +566,7 @@ export function ticketPrefillFromAiAssistAction(action = {}) {
     track: cleanText(payload.track, 40) || null,
     subject: cleanText(payload.subject, 160),
     category: cleanText(payload.category, 80),
-    priority: cleanText(payload.priority, 40) || "medium",
+    priority: cleanText(payload.priority, 40),
     zone: cleanText(payload.zone || payload.location, 160),
     asset: cleanText(payload.asset, 160),
     forkliftId: cleanText(payload.forkliftId, 160),

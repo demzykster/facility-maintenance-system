@@ -21,6 +21,7 @@ describe("AI agent action adapter", () => {
         subject: "נזילה",
         description: "בדיקה",
         track: "facility",
+        priority: "medium",
         zone: "מחסן"
       }
     });

@@ -10,6 +10,7 @@ const readyAction = {
     track: "facility",
     subject: "דליפת מים",
     description: "יש דליפה באזור קבלה",
+    priority: "medium",
     zone: "קבלה",
     status: "new",
     createdAt: 1000,
@@ -722,6 +723,13 @@ describe("AI assist action execution model", () => {
       driverInvolvedId: "11032"
     });
     expect(ticketPrefillFromAiAssistAction({ ...readyAction, type: "ticket.delete" })).toBeNull();
+  });
+
+  it("does not default an AI ticket form prefill to medium priority", () => {
+    expect(ticketPrefillFromAiAssistAction({
+      ...readyAction,
+      payload: { track: "facility", subject: "Door", description: "Stuck", category: "doors" }
+    })).toMatchObject({ priority: "" });
   });
 
   it("preserves validated facility category and neutral priority in TicketForm prefill", () => {

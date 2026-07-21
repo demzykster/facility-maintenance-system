@@ -221,6 +221,7 @@ describe("AI assist action model", () => {
         id: "create_ticket",
         type: "ticket.create",
         status: "needs_form_review",
+        missingFields: ["priority"],
         requiresConfirmation: true,
         writesData: false,
         execute: expect.objectContaining({
@@ -231,7 +232,7 @@ describe("AI assist action model", () => {
           track: "facility",
           subject: "המזגן מטפטף",
           category: "hvac",
-          priority: "medium",
+          priority: "",
           zone: "משרדים",
           status: "new",
           createdBy: expect.objectContaining({
@@ -258,11 +259,11 @@ describe("AI assist action model", () => {
         id: "create_ticket",
         type: "ticket.create",
         status: "needs_form_review",
-        missingFields: [],
+        missingFields: ["priority"],
         payload: expect.objectContaining({
           track: "facility",
           zone: "холодильной комнате F-002",
-          priority: "medium",
+          priority: "",
           description: "сломалась ручка двери холодильника в холодильной комнате F-002"
         })
       })
@@ -348,11 +349,11 @@ describe("AI assist action model", () => {
       expect.objectContaining({
         type: "ticket.create",
         status: "needs_human_input",
-        missingFields: expect.arrayContaining(["zone"]),
+        missingFields: expect.arrayContaining(["priority", "zone"]),
         payload: expect.objectContaining({
           track: "facility",
           zone: "",
-          priority: "medium"
+          priority: ""
         })
       })
     ]);
@@ -376,11 +377,11 @@ describe("AI assist action model", () => {
       expect.objectContaining({
         type: "ticket.create",
         status: "needs_human_input",
-        missingFields: ["zone"],
+        missingFields: ["priority", "zone"],
         payload: expect.objectContaining({
           track: "facility",
           category: "hvac",
-          priority: "medium",
+          priority: "",
           zone: "",
           subject: "מזגן לא עובד בחדר מפעיל מערכת"
         })
@@ -405,11 +406,11 @@ describe("AI assist action model", () => {
       expect.objectContaining({
         type: "ticket.create",
         status: "needs_form_review",
-        missingFields: [],
+        missingFields: ["priority"],
         payload: expect.objectContaining({
           track: "facility",
           category: "hvac",
-          priority: "medium",
+          priority: "",
           zone: "משרדים",
           subject: "מזגן לא עובד בחדר מפעיל מערכת"
         })
@@ -444,7 +445,7 @@ describe("AI assist action model", () => {
         status: "needs_form_review",
         requiresConfirmation: true,
         writesData: false,
-        missingFields: ["downtimeType"],
+        missingFields: ["priority", "downtimeType"],
         reviewMode: "ticket_form",
         payload: expect.objectContaining({
           track: "transport",
@@ -478,16 +479,16 @@ describe("AI assist action model", () => {
       expect.objectContaining({
         id: "create_ticket",
         type: "ticket.create",
-        status: "ready_for_confirmation",
+        status: "needs_form_review",
         requiresConfirmation: true,
         writesData: false,
-        missingFields: [],
+        missingFields: ["priority"],
         payload: expect.objectContaining({
           track: "transport",
           forkliftId: "fleet-120823",
           asset: "120823",
           downtimeType: "critical",
-          priority: "high"
+          priority: ""
         })
       })
     ]);
@@ -515,12 +516,12 @@ describe("AI assist action model", () => {
       expect.objectContaining({
         id: "create_ticket",
         type: "ticket.create",
-        status: "ready_for_confirmation",
-        missingFields: [],
+        status: "needs_form_review",
+        missingFields: ["priority"],
         payload: expect.objectContaining({
           forkliftId: "fleet-120823",
           downtimeType: "has_replacement",
-          priority: "medium"
+          priority: ""
         })
       })
     ]);

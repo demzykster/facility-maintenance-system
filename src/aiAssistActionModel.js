@@ -60,13 +60,6 @@ function priorityFromSeverity(severity = "normal") {
   return "medium";
 }
 
-function priorityFromDowntimeType(downtimeType = "") {
-  if (downtimeType === "critical") return "high";
-  if (downtimeType === "minor") return "low";
-  if (downtimeType === "has_replacement") return "medium";
-  return "";
-}
-
 function ticketTrackForModule(module = "") {
   if (module === "transport") return "transport";
   if (["facility", "safety"].includes(module)) return "facility";
@@ -97,12 +90,10 @@ function ticketCategoryForDraft(draft = {}, track = "") {
   return ticketCategoryForModule(module);
 }
 
-function ticketPriorityForDraft({ draft = {}, track = "", downtimeType = "" } = {}) {
+function ticketPriorityForDraft({ draft = {} } = {}) {
   const explicitPriority = requestedPriorityFromText(draft.rawText);
   if (explicitPriority) return explicitPriority;
-  if (track === "transport") return priorityFromDowntimeType(downtimeType) || priorityFromSeverity(draft.severity);
-  if (draft.module === "safety" || draft.severity === "critical") return "high";
-  return "medium";
+  return "";
 }
 
 function facilityDescriptionFromDraft(draft = {}, category = "") {
@@ -129,6 +120,7 @@ function missingFieldsForTicketPayload(payload = {}, draft = {}) {
   if (!payload.track) missing.push("track");
   if (!payload.subject) missing.push("subject");
   if (!payload.description) missing.push("description");
+  if (!payload.priority) missing.push("priority");
   if (payload.track === "facility" && !payload.zone) missing.push("zone");
   if (payload.track === "transport" && !payload.forkliftId) missing.push("forkliftId");
   if (payload.track === "transport" && !payload.downtimeType) missing.push("downtimeType");
@@ -138,11 +130,11 @@ function missingFieldsForTicketPayload(payload = {}, draft = {}) {
 
 function shouldReviewTicketCreateInForm(payload = {}, missingFields = []) {
   const missing = Array.isArray(missingFields) ? missingFields : [];
-  if (payload.track === "facility" && missing.length === 0) return true;
+  if (payload.track === "facility" && missing.every((field) => field === "priority")) return true;
   if (payload.track === "transport"
     && payload.forkliftId
-    && missing.length === 1
-    && missing[0] === "downtimeType") return true;
+    && missing.length > 0
+    && missing.every((field) => field === "downtimeType" || field === "priority")) return true;
   return false;
 }
 
@@ -684,7 +676,7 @@ export function buildAiTicketCreatePayload({ draft = {}, user = {}, now = Date.n
   const category = ticketCategoryForDraft(draft, track);
   const subject = ticketSubjectFromDraft(draft, { track, location });
   const description = ticketDescriptionFromDraft(draft, { track, category });
-  const priority = ticketPriorityForDraft({ draft, track, downtimeType });
+  const priority = ticketPriorityForDraft({ draft });
   const createdAt = Number.isFinite(Number(now)) ? Number(now) : Date.now();
   const fleetUnit = track === "transport" ? draftFleetUnitFromText(draft.rawText, context.fleet) : null;
   const fleetAsset = fleetUnit ? cleanText(fleetUnit.code || fleetUnit.num || fleetUnit.number || fleetUnit.asset || fleetUnit.unitCode || fleetUnit.workerNo || fleetUnit.vehicleNumber || fleetUnit.licensePlate || fleetUnit.displayNumber || fleetUnit.id, 160) : "";

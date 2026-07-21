@@ -36,14 +36,22 @@ describe("ticket create contract", () => {
     expect(isDowntimeOutOfService(downtimeLevelOf("minor", { downtimeLevels: levels }))).toBe(false);
   });
 
-  it("defines only real blocking fields for ordinary create", () => {
+  it("requires an explicit priority for every ordinary create", () => {
     expect(missingTicketCreateFields({
       track: "transport",
       subject: "Не работает вентилятор",
       description: "Не работает вентилятор на машине 226",
       forkliftId: "forklift-226",
-      downtimeType: "needs_triage"
+      downtimeType: "needs_triage",
+      priority: "medium"
     })).toEqual([]);
+    expect(missingTicketCreateFields({
+      track: "facility",
+      subject: "Air conditioner",
+      description: "Not cooling",
+      category: "hvac"
+    })).toContain("priority");
+    expect(ticketCreateContractSummary().fields.priority).toContain("required_blocking");
     expect(ticketCreateContractSummary().fields.location).toBeUndefined();
     expect(ticketCreateContractSummary().fields.num).toEqual(["derived", "not_user_askable"]);
   });
