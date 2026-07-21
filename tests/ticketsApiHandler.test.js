@@ -1499,6 +1499,35 @@ describe("tickets API handler", () => {
     expect(driver.delete).toHaveBeenCalledWith("F-cleanup");
   });
 
+  it("keeps a successful ticket deletion successful when audit persistence fails", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue(ticketRecord({ id: "T-audit-fails" })),
+      delete: vi.fn().mockResolvedValue(undefined)
+    };
+    const auditDriver = { write: vi.fn().mockRejectedValue(new Error("audit unavailable")) };
+    const handler = createTicketsApiHandler({
+      driver,
+      auditDriver,
+      sessionClient: sessionClientFor({ id: "admin-1", role: "admin", permissions: { tickets: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "DELETE",
+      headers: { authorization: "Bearer user-token" },
+      query: { id: "T-audit-fails" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      ok: true,
+      ticket: { id: "T-audit-fails" },
+      cleanup: { files: 0, metadata: false, errors: 0 },
+      audit: { ok: false, error: "audit_write_failed" }
+    });
+    expect(driver.delete).toHaveBeenCalledWith("T-audit-fails");
+    expect(auditDriver.write).toHaveBeenCalled();
+  });
+
   it("reports a mandatory backend delete failure and skips secondary cleanup", async () => {
     const driver = {
       get: vi.fn().mockResolvedValue(ticketRecord({ id: "T-delete-fails" })),

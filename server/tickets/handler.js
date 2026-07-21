@@ -86,6 +86,15 @@ const writeAuditEvent = async (auditDriver, event) => {
   if (typeof auditDriver.write === "function") return auditDriver.write(event);
 };
 
+const writeBestEffortAuditEvent = async (auditDriver, event) => {
+  try {
+    await writeAuditEvent(auditDriver, event);
+    return null;
+  } catch {
+    return { ok: false, error: "audit_write_failed" };
+  }
+};
+
 const ticketWriteAuditEvent = (ticket, actor, action = AUDIT_ACTIONS.update) => normalizeAuditEvent({
   at: Date.now(),
   actorId: actor.id,
@@ -242,8 +251,8 @@ export function createTicketsApiHandler({ driver = null, auditDriver = null, met
         if (scopePermissionError) return json(res, 403, { error: scopePermissionError });
         await backendDriver.delete(id);
         const cleanup = await deleteTicketOwnedFiles({ ticketId: id, fileDriver: backendFileDriver, metadataDriver: backendMetadataDriver });
-        await writeAuditEvent(backendAuditDriver, ticketDeleteAuditEvent(id, auth.user));
-        return json(res, 200, { ok: true, ticket: { id }, cleanup });
+        const audit = await writeBestEffortAuditEvent(backendAuditDriver, ticketDeleteAuditEvent(id, auth.user));
+        return json(res, 200, { ok: true, ticket: { id }, cleanup, ...(audit ? { audit } : {}) });
       }
 
       const rawTicket = body?.ticket || body;
