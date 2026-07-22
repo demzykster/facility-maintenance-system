@@ -123,3 +123,10 @@ Each exception must include:
 - Why necessary: ticket detail still receives save callbacks and local/normalized ticket providers from `src/ClaudeMaintenanceApp.jsx`; this hotfix adds a minimal `updateTicketDowntime` wiring path so transport tickets can edit `מצב הכלי` through the dedicated transport severity model instead of the generic facility priority editor.
 - Why extraction was not the right move: the validation, derived priority, SLA recalculation, and history logic live in `src/ticketDowntimeUpdateModel.js` and the server guard lives in `server/tickets/handler.js`; extracting the whole ticket detail/save surface would be broader than this owner-reported transport processing bug.
 - Follow-up/removal condition: when ticket detail and ticket save orchestration move into a dedicated ticket module, move this callback wiring with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
+
+- Date: 2026-07-22
+- Owner goal: public login footer and QR layout refinement.
+- New line count: 10122.
+- Why necessary: the public login screen and shell-hosted stylesheet still live in `src/ClaudeMaintenanceApp.jsx`; this focused presentation change hides the public QR report action on desktop, keeps it available on mobile, and moves the dynamic footer/description into the freed panel area without changing authentication, scanner behavior, branding data, or API contracts.
+- Why extraction was not the right move: extracting the full public entry screen would be broader than this owner-requested layout correction; the change only adjusts existing login markup/CSS around already wired auth, branding, install prompt, and public scanner controls.
+- Follow-up/removal condition: when the public entry screen moves into a dedicated module/stylesheet, move this footer and QR presentation with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
