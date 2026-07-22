@@ -107,6 +107,19 @@ function transportRoutingError(actor = {}, previousTicket = {}, nextTicket = {},
   return null;
 }
 
+function transportPreAcceptanceWaitingError(actor = {}, previousTicket = {}, nextTicket = {}, { fleet = [] } = {}) {
+  if (!isTransportTicket(nextTicket) || transitionKey(previousTicket, nextTicket) !== "new:waiting") return null;
+  if (clean(nextTicket.waitingReason) !== "no_equipment") return "transport_pre_acceptance_waiting_reason_forbidden";
+  if (roleOf(actor) !== "tech" || !actorCanHandleTransport(actor)) return "transport_acceptance_actor_forbidden";
+
+  const assetId = clean(nextTicket.forkliftId || nextTicket.assetId || nextTicket.fleetId);
+  const supplier = transportTicketSupplierName(nextTicket, fleet);
+  if (!assetId || !supplier || !assigneeName(nextTicket)) return "ticket_transition_required_fields_missing:transport_acceptance";
+  if (clean(actor.supplier) !== supplier) return "transport_acceptance_supplier_mismatch";
+  if (!assigneeMatchesActor(nextTicket, actor)) return "transport_acceptance_assignee_mismatch";
+  return null;
+}
+
 function technicalReturnError(actor = {}, previousTicket = {}, nextTicket = {}, { fleet = [] } = {}) {
   const from = statusOf(previousTicket);
   const to = statusOf(nextTicket);
@@ -210,6 +223,7 @@ function actorCanDriveTransition(actor = {}, previousTicket = {}, nextTicket = {
   if (role === "tech") {
     return [
       "new:in_progress",
+      "new:waiting",
       "in_progress:waiting",
       "waiting:in_progress",
       "in_progress:pending_user",
@@ -250,6 +264,7 @@ export function ticketLifecycleTransitionError(actor = {}, previousTicket = {}, 
   if (!allowedByMatrix(from, to)) return `ticket_transition_forbidden:${from}:${to}`;
   if (!actorCanDriveTransition(actor, previousTicket, nextTicket)) return `ticket_transition_role_forbidden:${roleOf(actor) || "unknown"}:${from}:${to}`;
   return transportRoutingError(actor, previousTicket, nextTicket, options)
+    || transportPreAcceptanceWaitingError(actor, previousTicket, nextTicket, options)
     || technicalReturnError(actor, previousTicket, nextTicket, options)
     || technicianCompletionError(actor, previousTicket, nextTicket, options)
     || technicianCancellationError(actor, previousTicket, nextTicket)

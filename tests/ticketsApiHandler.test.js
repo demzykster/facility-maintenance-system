@@ -1029,6 +1029,77 @@ describe("tickets API handler", () => {
     }));
   });
 
+  it("allows an eligible supplier technician to report that a queued transport tool was not received", async () => {
+    const existing = ticketRecord({ id: "T-no-equipment", status: "new", track: "transport", forkliftId: "fork-ops", supplier: "Toyota", assignee: "", routedTech: true });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn().mockImplementation(async (ticket) => ({ legacy_payload: ticket })),
+      create: vi.fn()
+    };
+    const token = signCmmsSessionToken("tech-sharon", "tech", "", "session-secret", Date.now()).token;
+    const handler = createTicketsApiHandler({
+      driver,
+      fleetDriver: { list: vi.fn().mockResolvedValue([{ id: "fork-ops", depts: ["Ops"], supplier: "Toyota" }]) },
+      pinSessionClient: pinSessionClientFor({ id: "tech-sharon", name: "Sharon", supplier: "Toyota", techScope: "transport" }),
+      env: { CMMS_SESSION_SECRET: "session-secret", CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: `Bearer ${token}` },
+      body: {
+        operation: "update",
+        ticket: {
+          ...existing,
+          status: "waiting",
+          waitingReason: "no_equipment",
+          waitBall: "manager",
+          assignee: "Sharon",
+          equipWaitSince: 3_000
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      id: "T-no-equipment",
+      status: "waiting",
+      waitingReason: "no_equipment",
+      waitBall: "manager",
+      assignee: "Sharon",
+      supplier: "Toyota",
+      routedTech: true,
+      equipWaitSince: 3_000
+    }));
+  });
+
+  it("rejects arbitrary waiting reasons before supplier technician acceptance", async () => {
+    const existing = ticketRecord({ id: "T-wait-before-accept", status: "new", track: "transport", forkliftId: "fork-ops", supplier: "Toyota", assignee: "", routedTech: true });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn(),
+      create: vi.fn()
+    };
+    const token = signCmmsSessionToken("tech-sharon", "tech", "", "session-secret", Date.now()).token;
+    const handler = createTicketsApiHandler({
+      driver,
+      fleetDriver: { list: vi.fn().mockResolvedValue([{ id: "fork-ops", depts: ["Ops"], supplier: "Toyota" }]) },
+      pinSessionClient: pinSessionClientFor({ id: "tech-sharon", name: "Sharon", supplier: "Toyota", techScope: "transport" }),
+      env: { CMMS_SESSION_SECRET: "session-secret", CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: `Bearer ${token}` },
+      body: {
+        operation: "update",
+        ticket: { ...existing, status: "waiting", waitingReason: "parts", waitBall: "executor", assignee: "Sharon" }
+      }
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: "transport_pre_acceptance_waiting_reason_forbidden" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
   it("rejects transport acceptance by a manager before supplier technician acceptance", async () => {
     const existing = ticketRecord({ id: "T-manager-accept", status: "new", track: "transport", forkliftId: "fork-ops", supplier: "Toyota", assignee: "", routedTech: true, createdBy: { id: "manager-1", name: "Manager", role: "user", dept: "Ops" } });
     const driver = {

@@ -91,6 +91,43 @@ describe("server ticket lifecycle authority", () => {
     )).toBe("transport_acceptance_assignee_mismatch");
   });
 
+  it("allows a matching transport technician to report that the tool was not received before acceptance", () => {
+    const previous = { status: "new", track: "transport", forkliftId: "fork-ops", assignee: "", supplier: "Toyota", routedTech: true };
+    const next = { ...previous, status: "waiting", waitingReason: "no_equipment", waitBall: "manager", assignee: "Sharon", equipWaitSince: 3_000 };
+
+    expect(ticketLifecycleTransitionError(
+      { id: "tech-1", role: "tech", name: "Sharon", techScope: "transport", supplier: "Toyota" },
+      previous,
+      next,
+      { fleet }
+    )).toBeNull();
+
+    expect(ticketLifecycleTransitionError(
+      { id: "tech-2", role: "tech", name: "Dana", techScope: "transport", supplier: "Toyota" },
+      previous,
+      next,
+      { fleet }
+    )).toBe("transport_acceptance_assignee_mismatch");
+
+    expect(ticketLifecycleTransitionError(
+      { id: "tech-1", role: "tech", name: "Sharon", techScope: "transport", supplier: "Other" },
+      previous,
+      next,
+      { fleet }
+    )).toBe("transport_acceptance_supplier_mismatch");
+  });
+
+  it("does not let technicians put unaccepted transport tickets into arbitrary waiting reasons", () => {
+    const previous = { status: "new", track: "transport", forkliftId: "fork-ops", assignee: "", supplier: "Toyota", routedTech: true };
+
+    expect(ticketLifecycleTransitionError(
+      { id: "tech-1", role: "tech", name: "Sharon", techScope: "transport", supplier: "Toyota" },
+      previous,
+      { ...previous, status: "waiting", waitingReason: "parts", waitBall: "executor", assignee: "Sharon" },
+      { fleet }
+    )).toBe("transport_pre_acceptance_waiting_reason_forbidden");
+  });
+
   it("blocks technician cancellation of active transport work", () => {
     expect(ticketLifecycleTransitionError(
       { role: "tech", name: "Sharon", techScope: "transport", supplier: "Toyota" },
