@@ -109,3 +109,10 @@ Each exception must include:
 - Why necessary: ticket detail still receives save callbacks and shell state from `src/ClaudeMaintenanceApp.jsx`; the shell needs a small dedicated `updateTicketPriority` wiring path so the extracted priority update model and normalized ticket API can update only priority, SLA target, and history without routing through generic ticket save behavior.
 - Why extraction was not the right move: the validation and SLA recalculation logic lives in `src/ticketPriorityUpdateModel.js` and the server guard lives in `server/tickets/handler.js`; extracting the whole ticket detail/save surface would be broader than this bounded priority-edit task.
 - Follow-up/removal condition: when ticket detail and ticket save orchestration move into a dedicated ticket module, move this callback wiring and badge focus styling with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
+
+- Date: 2026-07-22
+- Owner goal: transport create severity and priority synchronization.
+- New line count: 10071.
+- Why necessary: the transport create form still lives in `src/ClaudeMaintenanceApp.jsx`; this hotfix must route the existing `מצב הכלי` selector through the shared create contract and derive internal priority from the selected transport severity while removing the generic priority selector from transport-only creation.
+- Why extraction was not the right move: the shared domain logic was moved into `src/ticketCreateContract.js`, while extracting the full ticket create modal would be broader than this owner-reported transport form and AI intake bug.
+- Follow-up/removal condition: when the ticket create modal/form moves into a dedicated ticket module, move this transport severity wiring with it and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.

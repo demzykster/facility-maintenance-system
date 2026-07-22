@@ -3,7 +3,7 @@ import { createTicketRecord } from "../../tickets/ticketCreateDomain.js";
 import { CAPABILITY_RISK, createAiCapabilityRegistry } from "./registry.js";
 import { AI_CAPABILITY_EXECUTION_STATUS, normalizeAiCapabilityResponse } from "../../../src/aiCapabilityResponseModel.js";
 import { aiAutonomousTicketCreatePermitted } from "../../../src/aiAutonomousCapabilityFlagModel.js";
-import { ticketCreateContractSummary } from "../../../src/ticketCreateContract.js";
+import { DEFAULT_TRANSPORT_DOWNTIME_LEVELS, ticketCreateContractSummary } from "../../../src/ticketCreateContract.js";
 import {
   buildInlineTicketIntakePlan,
   createdInlineTicketAnswer,
@@ -264,8 +264,8 @@ export function createTicketReadCapabilities() {
       authoritativeResult: "repo_ticket_create_contract",
       allowedErrors: [],
       retrySemantics: "safe",
-      async execute() {
-        return { ok: true, result: ticketCreateContractSummary({}, []) };
+      async execute(_args = {}, context = {}) {
+        return { ok: true, result: ticketCreateContractSummary(cleanObject(context.config), DEFAULT_TRANSPORT_DOWNTIME_LEVELS) };
       }
     },
     {
@@ -413,6 +413,24 @@ export function createTicketCreateCapability({ driver = null } = {}) {
       });
       if (plan.domain === "transport" && plan.ticket?.forkliftId && RECURRENCE_RE.test(text)) {
         await executeRead("get_open_tickets_for_asset", { assetId: plan.ticket.forkliftId });
+      }
+
+      if (!plan.ticket && plan.domain === "transport" && DANGEROUS_RE.test(text)) {
+        return createBlockingResponse({
+          question: "זה נשמע כמו תקלה שעלולה להשפיע על בטיחות או השבתה. האם הכלי מושבת ואין להשתמש בו?",
+          facts: plan.facts,
+          unknowns: ["safe_downtime_state"],
+          toolResults,
+          intake: {
+            intakeId: "create_ticket",
+            workflow: plan.workflow,
+            domain: plan.domain,
+            status: plan.status,
+            pendingField: "",
+            originalMessage: plan.originalMessage,
+            draft: plan.draft
+          }
+        });
       }
 
       if (!plan.ticket) {

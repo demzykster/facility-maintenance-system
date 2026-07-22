@@ -1,4 +1,8 @@
-import { SYSTEM_DOWNTIME_NEEDS_TRIAGE } from "./ticketCreateContract.js";
+import {
+  DEFAULT_TRANSPORT_DOWNTIME_LEVELS,
+  transportDowntimeTypeFromText,
+  transportPriorityForDowntimeType
+} from "./ticketCreateContract.js";
 
 const HOUR = 3600000;
 const MAX_SUBJECT_CHARS = 80;
@@ -498,6 +502,7 @@ function priorityFromText(text = "") {
 }
 
 const priorityQuestion = () => "מה העדיפות: גבוהה, בינונית או נמוכה?";
+const transportDowntimeQuestion = () => "מה מצב הכלי: תקלה לטיפול או בדיקה, תקלה שאינה מוציאה מכלל שימוש, או תקלה קריטית?";
 
 function stripTrailingLocation(subject = "", location = "") {
   const raw = cleanText(subject, MAX_DESCRIPTION_CHARS);
@@ -528,21 +533,23 @@ function assetDisplay(asset = {}) {
   return cleanText(asset.code || asset.num || asset.number || asset.asset || asset.unitCode || asset.workerNo || asset.vehicleNumber || asset.licensePlate || asset.displayNumber || asset.id, 160);
 }
 
-function buildTransportTicket({ text = "", asset = {}, priority = "", user = {}, now = Date.now(), ticketId = "" } = {}) {
+function buildTransportTicket({ text = "", asset = {}, downtimeType = "", config = {}, user = {}, now = Date.now(), ticketId = "" } = {}) {
   const actor = actorTicketPayload(user);
   const subject = compactSubject(text) || "תקלה בכלי שינוע";
   const department = cleanText(asset.department || asset.dept || actorDepartment(user), 120);
+  const selectedDowntimeType = cleanText(downtimeType, 80);
+  const priority = transportPriorityForDowntimeType(selectedDowntimeType, config, DEFAULT_TRANSPORT_DOWNTIME_LEVELS);
   return {
     id: cleanText(ticketId, 160),
     track: "transport",
     subject,
     category: "transport",
     categoryLabel: "",
-    priority: cleanText(priority, 40),
+    priority,
     zone: "",
     asset: assetDisplay(asset),
     forkliftId: cleanText(asset.id, 160),
-    downtimeType: SYSTEM_DOWNTIME_NEEDS_TRIAGE.id,
+    downtimeType: selectedDowntimeType,
     description: cleanText(text, MAX_DESCRIPTION_CHARS),
     status: "new",
     assignee: "",
@@ -557,7 +564,7 @@ function buildTransportTicket({ text = "", asset = {}, priority = "", user = {},
     createdBy: actor,
     createdAt: now,
     updatedAt: now,
-    dueAt: now + 24 * HOUR,
+    dueAt: now + (priority === "high" ? 8 : priority === "low" ? 72 : 24) * HOUR,
     ai: {
       source: "inline_ai_ticket_intake",
       autonomous: true,
@@ -704,7 +711,18 @@ export function buildInlineTicketIntakePlan({
   const baseText = cleanText(previous?.draft?.subject || previous?.originalMessage || rawText, MAX_DESCRIPTION_CHARS);
   const fleet = visibleFleet(context, fullVisibleFleet);
   const pendingPriority = previous?.pendingField === "priority";
+  const pendingDowntimeType = previous?.pendingField === "downtimeType";
   if (pendingPriority) {
+    if (previous.domain === "transport") {
+      return collectingPlan({
+        domain: "transport",
+        pendingField: "downtimeType",
+        question: transportDowntimeQuestion(),
+        unknowns: ["downtimeType"],
+        draft: { ...previous.draft, priority: "" },
+        originalMessage: previous.originalMessage
+      });
+    }
     const priority = priorityFromText(latest);
     if (!priority) {
       return collectingPlan({
@@ -714,25 +732,6 @@ export function buildInlineTicketIntakePlan({
         unknowns: ["priority"],
         draft: previous.draft,
         originalMessage: previous.originalMessage
-      });
-    }
-    if (previous.domain === "transport") {
-      const asset = fleet.find((item) => cleanText(item.id, 160) === previous.draft.forkliftId) || {
-        id: previous.draft.forkliftId,
-        code: previous.draft.asset
-      };
-      const ticket = buildTransportTicket({
-        text: previous.originalMessage || previous.draft.description,
-        asset,
-        priority,
-        user,
-        now,
-        ticketId
-      });
-      return readyPlan({
-        domain: "transport",
-        ticket,
-        facts: [{ domain: "transport", assetId: ticket.forkliftId, assetCode: ticket.asset }]
       });
     }
     if (previous.domain === "facility") {
@@ -756,8 +755,43 @@ export function buildInlineTicketIntakePlan({
       }
     }
   }
+  if (pendingDowntimeType) {
+    const downtimeType = transportDowntimeTypeFromText(latest, config, DEFAULT_TRANSPORT_DOWNTIME_LEVELS);
+    if (!downtimeType) {
+      return collectingPlan({
+        domain: "transport",
+        pendingField: "downtimeType",
+        question: transportDowntimeQuestion(),
+        unknowns: ["downtimeType"],
+        draft: previous.draft,
+        originalMessage: previous.originalMessage
+      });
+    }
+    const asset = fleet.find((item) => cleanText(item.id, 160) === previous.draft.forkliftId) || {
+      id: previous.draft.forkliftId,
+      code: previous.draft.asset
+    };
+    const ticket = buildTransportTicket({
+      text: previous.originalMessage || previous.draft.description,
+      asset,
+      downtimeType,
+      config,
+      user,
+      now,
+      ticketId
+    });
+    return readyPlan({
+      domain: "transport",
+      ticket,
+      facts: [{ domain: "transport", assetId: ticket.forkliftId, assetCode: ticket.asset, downtimeType: ticket.downtimeType }]
+    });
+  }
   const carriedPriority = ["high", "medium", "low"].includes(previous?.draft?.priority) ? previous.draft.priority : "";
   const selectedPriority = priorityFromText(previous?.originalMessage || rawText) || priorityFromText(latest) || carriedPriority;
+  const carriedDowntimeType = cleanText(previous?.draft?.downtimeType, 80);
+  const selectedDowntimeType = transportDowntimeTypeFromText(previous?.originalMessage || rawText, config, DEFAULT_TRANSPORT_DOWNTIME_LEVELS)
+    || transportDowntimeTypeFromText(latest, config, DEFAULT_TRANSPORT_DOWNTIME_LEVELS)
+    || carriedDowntimeType;
   const pendingTransport = previous?.domain === "transport" && previous.pendingField === "asset";
   const pendingFacilityLocation = previous?.domain === "facility" && previous.pendingField === "location";
   const assetSearchText = pendingTransport ? latest : rawText;
@@ -773,23 +807,23 @@ export function buildInlineTicketIntakePlan({
 
   if (transportEntity) {
     if (assetResult.status === "matched") {
-      const priority = selectedPriority;
       const ticket = buildTransportTicket({
         text: baseText || rawText,
         asset: assetResult.asset,
-        priority,
+        downtimeType: selectedDowntimeType,
+        config,
         user,
         now,
         ticketId
       });
-      if (!priority) {
+      if (!selectedDowntimeType || !ticket.priority) {
         return collectingPlan({
           domain: "transport",
-          pendingField: "priority",
-          question: priorityQuestion(),
-          unknowns: ["priority"],
+          pendingField: "downtimeType",
+          question: transportDowntimeQuestion(),
+          unknowns: ["downtimeType"],
           facts: [{ domain: "transport", assetId: ticket.forkliftId, assetCode: ticket.asset }],
-          draft: ticket,
+          draft: { ...ticket, priority: "", downtimeType: selectedDowntimeType },
           originalMessage: previous?.originalMessage || rawText
         });
       }
@@ -799,17 +833,21 @@ export function buildInlineTicketIntakePlan({
         facts: [{
           domain: "transport",
           assetId: ticket.forkliftId,
-          assetCode: ticket.asset
+          assetCode: ticket.asset,
+          downtimeType: ticket.downtimeType
         }]
       });
     }
+    const draftPriority = selectedDowntimeType
+      ? transportPriorityForDowntimeType(selectedDowntimeType, config, DEFAULT_TRANSPORT_DOWNTIME_LEVELS)
+      : "";
     const draft = {
       track: "transport",
       subject: compactSubject(baseText || rawText) || "תקלה בכלי שינוע",
       description: cleanText(baseText || rawText, MAX_DESCRIPTION_CHARS),
       category: "transport",
-      priority: selectedPriority,
-      downtimeType: SYSTEM_DOWNTIME_NEEDS_TRIAGE.id
+      priority: draftPriority,
+      downtimeType: selectedDowntimeType
     };
     if (assetResult.status === "ambiguous") {
       return collectingPlan({

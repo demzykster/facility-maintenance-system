@@ -3,6 +3,12 @@ export const TICKET_TRACKS = Object.freeze({
   transport: "transport"
 });
 
+export const DEFAULT_TRANSPORT_DOWNTIME_LEVELS = Object.freeze([
+  { id: "has_replacement", label: "יש תחליף", desc: "הכלי מושבת אך קיים תחליף זמין", color: "#16A34A", prio: "medium", oos: false },
+  { id: "minor", label: "תקלה שאינה מוציאה מכלל שימוש", desc: "ניתן להמשיך לעבוד · בדיקה/תחזוקה", color: "#CA8A04", prio: "low", oos: false },
+  { id: "critical", label: "תקלה קריטית — אין תחליף", desc: "הכלי מושבת ואין תחליף", color: "#DC2626", prio: "high", oos: true }
+]);
+
 export const SYSTEM_DOWNTIME_NEEDS_TRIAGE = Object.freeze({
   id: "needs_triage",
   label: "נדרש אבחון",
@@ -41,11 +47,20 @@ const cleanText = (value, limit = 1000) => String(value || "")
   .slice(0, limit);
 
 const cleanArray = (value) => Array.isArray(value) ? value : [];
+const lookupText = (value = "") => cleanText(value, 800).toLowerCase();
+
+function configuredDowntimeLevels(config = {}, fallbackLevels = []) {
+  const fallback = cleanArray(fallbackLevels).length ? fallbackLevels : DEFAULT_TRANSPORT_DOWNTIME_LEVELS;
+  const configured = cleanArray(config?.downtimeLevels).length ? config.downtimeLevels : fallback;
+  return cleanArray(configured).filter((level) => level?.id !== SYSTEM_DOWNTIME_NEEDS_TRIAGE.id);
+}
 
 export function downtimeLevelsWithSystemDefaults(config = {}, fallbackLevels = []) {
-  const configured = cleanArray(config?.downtimeLevels).length ? config.downtimeLevels : fallbackLevels;
-  const withoutDuplicate = cleanArray(configured).filter((level) => level?.id !== SYSTEM_DOWNTIME_NEEDS_TRIAGE.id);
-  return [SYSTEM_DOWNTIME_NEEDS_TRIAGE, ...withoutDuplicate];
+  return [SYSTEM_DOWNTIME_NEEDS_TRIAGE, ...configuredDowntimeLevels(config, fallbackLevels)];
+}
+
+export function transportCreateDowntimeLevels(config = {}, fallbackLevels = []) {
+  return configuredDowntimeLevels(config, fallbackLevels);
 }
 
 export function downtimeLevelOf(id = "", config = {}, fallbackLevels = []) {
@@ -61,6 +76,49 @@ export function isDowntimeOutOfService(level = {}) {
 
 export function isDowntimeNeedsTriage(level = {}) {
   return level?.requiresTriage === true || level?.id === SYSTEM_DOWNTIME_NEEDS_TRIAGE.id;
+}
+
+export function transportPriorityForDowntimeType(id = "", config = {}, fallbackLevels = []) {
+  const cleanId = cleanText(id, 80);
+  if (!cleanId) return "";
+  const level = transportCreateDowntimeLevels(config, fallbackLevels).find((item) => item?.id === cleanId)
+    || fallbackLevels.find((item) => item?.id === cleanId);
+  return cleanText(level?.prio, 40);
+}
+
+export function transportDowntimeTypeFromText(text = "", config = {}, fallbackLevels = []) {
+  const raw = lookupText(text);
+  if (!raw) return "";
+  const levels = transportCreateDowntimeLevels(config, fallbackLevels);
+  const byExplicitText = levels.find((level) => {
+    const haystack = [level?.id, level?.label, level?.desc]
+      .map((value) => lookupText(value))
+      .filter(Boolean);
+    return haystack.some((value) => raw.includes(value));
+  });
+  if (byExplicitText?.id) return cleanText(byExplicitText.id, 80);
+
+  const critical = levels.find((level) => level?.id === "critical")
+    || levels.find((level) => level?.oos === true && cleanText(level?.prio, 40) === "high")
+    || levels.find((level) => level?.oos === true);
+  const replacement = levels.find((level) => level?.id === "has_replacement")
+    || levels.find((level) => level?.oos === false && cleanText(level?.prio, 40) === "medium");
+  const minor = levels.find((level) => level?.id === "minor")
+    || levels.find((level) => level?.oos === false && cleanText(level?.prio, 40) === "low");
+
+  if (/אין\s+(?:תחליף|גיבוי)|ללא\s+(?:תחליף|גיבוי)|מושבת(?:ת)?\s+ואין|הכלי\s+מושבת|מוציא(?:ה)?\s+מכלל\s+שימוש|השבתה\s+קריטית|out\s+of\s+service|no\s+(?:replacement|spare|backup)|critical\s+downtime/i.test(raw)) {
+    return cleanText(critical?.id, 80);
+  }
+  if (/יש\s+(?:תחליף|גיבוי)|קיים\s+(?:תחליף|גיבוי)|תחליף\s+זמין|גיבוי\s+זמין|with\s+replacement|replacement\s+available|backup\s+available|spare\s+available/i.test(raw)) {
+    return cleanText(replacement?.id, 80);
+  }
+  if (/ניתן\s+להמשיך\s+לעבוד|אפשר\s+להמשיך\s+לעבוד|לא\s+מוציא(?:ה)?\s+מכלל\s+שימוש|לא\s+מושבת|minor\s+downtime|minor|can\s+continue/i.test(raw)) {
+    return cleanText(minor?.id, 80);
+  }
+  if (/תקלה|בעיה|לא\s+עובד|לא\s+עובדת|שבור|שבורה|שבורים|שבורות|broken|not\s+working|fault|problem|не\s+работ|сломал|полом|проблем/i.test(raw)) {
+    return cleanText(minor?.id, 80);
+  }
+  return "";
 }
 
 export function ticketTrackForCreate(input = {}) {
@@ -86,7 +144,7 @@ export function ticketCreateContractSummary(config = {}, fallbackDowntimeLevels 
   return {
     version: 1,
     fields: TICKET_CREATE_FIELD_CONTRACT,
-    downtimeLevels: downtimeLevelsWithSystemDefaults(config, fallbackDowntimeLevels).map((level) => ({
+    downtimeLevels: transportCreateDowntimeLevels(config, fallbackDowntimeLevels).map((level) => ({
       id: cleanText(level.id, 80),
       label: cleanText(level.label, 120),
       desc: cleanText(level.desc, 240),
@@ -94,6 +152,7 @@ export function ticketCreateContractSummary(config = {}, fallbackDowntimeLevels 
       prio: cleanText(level.prio, 40) || "medium",
       ...(level.oos === true ? { oos: true } : {}),
       ...(level.requiresTriage === true ? { requiresTriage: true } : {})
-    }))
+    })),
+    systemDowntimeLevels: [SYSTEM_DOWNTIME_NEEDS_TRIAGE]
   };
 }

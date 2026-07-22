@@ -105,7 +105,7 @@ import { ownsTicketRecord, pmFleet, pmVisibleForSession as pmVisible, techCanSee
 import { canConfirmTicketForSession, managerActionRequiredForTicket, managerScopedTicketNeedsFollowUp, requesterOwnsTicket } from "./ticketActionScopeModel.js";
 import { ADMIN_TICKET_DURATION_FIELDS, applyAdminTicketManualEdit, datetimeValueToMs, statusMsToHours } from "./adminTicketManualEditModel.js";
 import { normalizeScopedWorkerForActor, scopedUsersForActor, scopedWorkerDefaultsForActor, userDepartments, userShift } from "./userScopeModel.js";
-import { downtimeLevelOf, downtimeLevelsWithSystemDefaults, isDowntimeOutOfService, missingTicketCreateFields } from "./ticketCreateContract.js";
+import { DEFAULT_TRANSPORT_DOWNTIME_LEVELS, downtimeLevelOf, isDowntimeOutOfService, missingTicketCreateFields, transportCreateDowntimeLevels, transportPriorityForDowntimeType } from "./ticketCreateContract.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const AIPanel = lazy(() => import("./AIPanel.jsx").then((module) => ({ default: module.AIPanel })));
@@ -487,13 +487,9 @@ const TRANSITIONS = {
 };
 const canTransition = (from, to) => from === to || (TRANSITIONS[from] || []).includes(to);
 
-const DOWNTIME = [
-  { id: "has_replacement", label: "יש תחליף", desc: "הכלי מושבת אך קיים תחליף זמין", color: "#16A34A", prio: "medium", oos: false },
-  { id: "minor", label: "תקלה שאינה מוציאה מכלל שימוש", desc: "ניתן להמשיך לעבוד · בדיקה/תחזוקה", color: "#CA8A04", prio: "low", oos: false },
-  { id: "critical", label: "תקלה קריטית — אין תחליף", desc: "הכלי מושבת ואין תחליף", color: "#DC2626", prio: "high", oos: true },
-];
+const DOWNTIME = DEFAULT_TRANSPORT_DOWNTIME_LEVELS;
 // Уровни тяжести настраиваются админом (config.downtimeLevels); fallback — DOWNTIME. Поиск всегда что-то возвращает (целостность: ссылка на удалённый уровень не уронит экран).
-const dtLevels = (cfg) => downtimeLevelsWithSystemDefaults(cfg, DOWNTIME);
+const dtLevels = (cfg) => transportCreateDowntimeLevels(cfg, DOWNTIME);
 const dtOf = (id, cfg) => downtimeLevelOf(id, cfg, DOWNTIME);
 const DT_PALETTE = ["#1F4E8C", "#3E6DB0", "#6F7680", "#A4A9B0", "#16A34A", "#CA8A04", "#EA580C", "#DC2626", "#B91C1C"];
 const WEAR = [{ id: "natural", label: "בלאי טבעי" }, { id: "disproportionate", label: "נזק בלתי פרופורציונלי" }];
@@ -7487,6 +7483,8 @@ function TicketForm(p) {
       setDriverInvId("");
     }
   }, [track, forkliftId, ticketFleet]);
+  const transportPriority = track === "transport" ? transportPriorityForDowntimeType(downtimeType, config, DOWNTIME) : "";
+  const effectivePriority = track === "transport" ? transportPriority : priority;
   const handlePhoto = (file) => { if (!file) return; const r = new FileReader(); r.onload = (e) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const c = document.createElement("canvas"); c.width = width; c.height = height; c.getContext("2d").drawImage(img, 0, 0, width, height); setPhoto(c.toDataURL("image/jpeg", 0.6)); }; img.src = e.target.result; }; r.readAsDataURL(file); };
   const aiSuggest = async () => {
     const text = `${subject}\n${description}`.trim(); if (!text && !photo) { setErr("כתבו נושא/תיאור או צרפו תמונה"); return; }
@@ -7518,7 +7516,7 @@ function TicketForm(p) {
     const status = retroOn ? (retro.status || "new") : "new";
     const closedAt = retroOn ? datetimeValueToMs(retro.closedAt, datetimeValueToMs(retro.updatedAt, now)) : null;
     const updatedAt = retroOn ? datetimeValueToMs(retro.updatedAt, closedAt || now) : now;
-    const pr = priority;
+    const pr = effectivePriority;
     const hrs = (isAdmin && slaOn) ? (Number(slaH) || DEFAULT_SLA[pr]) : slaForTicket({ track, forkliftId, category, priority: pr }, config, ticketFleet);
     const dueAt = retroOn ? datetimeValueToMs(retro.dueAt, createdAt + hrs * 3600000) : createdAt + hrs * 3600000;
     const selectedFleet = track === "transport" ? ticketFleet.find((f) => f.id === forkliftId) : null;
@@ -7555,12 +7553,12 @@ function TicketForm(p) {
   };
   const submit = async () => {
     if (busyRef.current) return;
-    const missing = missingTicketCreateFields({ track, subject, description, category, priority, forkliftId, downtimeType });
+    const missing = missingTicketCreateFields({ track, subject, description, category, priority: effectivePriority, forkliftId, downtimeType });
     if (!subject.trim()) return setErr("נא להזין נושא");
     if (track === "facility" && !category) return setErr("נא לבחור קטגוריה");
     if (track === "transport" && !forkliftId) return setErr("נא לבחור כלי שינוע");
     if (track === "transport" && !downtimeType) return setErr("נא לבחור מצב הכלי");
-    if (!priority) return setErr("נא לבחור עדיפות");
+    if (track === "facility" && !priority) return setErr("נא לבחור עדיפות");
     if (!description.trim()) return setErr("נא לתאר את התקלה");
     if (missing.length) return setErr("נא להשלים את שדות החובה");
     setErr("");
@@ -7608,7 +7606,7 @@ function TicketForm(p) {
         <label className="field"><span>אזור</span><select value={facilityZone} onChange={(e) => setZone(e.target.value)}>{facilityZoneOptions.map((z) => <option key={z}>{z}</option>)}</select>{managerMaintZones.length > 0 && <div className="hint">מוצגים רק אזורי האחריות שלך.</div>}</label>
         <label className="field"><span>ציוד (אופציונלי)</span><input value={asset} onChange={(e) => setAsset(e.target.value)} /></label>
       </>)}
-      <div className="field"><span>עדיפות *</span><div className="pr-row">{PRIORITIES.map((x) => <button key={x.id} className={"pr-pick" + (priority === x.id ? " on" : "")} onClick={() => setPriority(x.id)} style={priority === x.id ? { background: x.color, color: "#fff", borderColor: x.color } : {}}>{x.label}</button>)}</div></div>
+      {track === "facility" && <div className="field"><span>עדיפות *</span><div className="pr-row">{PRIORITIES.map((x) => <button key={x.id} className={"pr-pick" + (priority === x.id ? " on" : "")} onClick={() => setPriority(x.id)} style={priority === x.id ? { background: x.color, color: "#fff", borderColor: x.color } : {}}>{x.label}</button>)}</div></div>}
       <label className="field"><span>תיאור התקלה *</span><textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} /></label>
       {track === "transport" && forkliftId && (() => { const fk = ticketFleet.find((f) => f.id === forkliftId); return eligibleTechs({ track: "transport", forkliftId, supplier: fk?.supplier || "" }, users, fleet).length === 0; })() && <div className="note" style={{ borderColor: "#FCA5A5", color: "#B91C1C", background: "#FEF2F2", marginTop: 0 }}><AlertTriangle size={13} /> אין כרגע טכנאי שינוע פעיל שיכול לקבל קריאה זו. אפשר להמשיך — הקריאה תסומן «ללא מטפל» ומנהל המערכת יקבל התראה לשיבוץ ידני.</div>}
       {isAdmin && <div className="admin-route">

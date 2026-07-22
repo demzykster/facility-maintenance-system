@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_TRANSPORT_DOWNTIME_LEVELS,
   SYSTEM_DOWNTIME_NEEDS_TRIAGE,
   downtimeLevelOf,
   downtimeLevelsWithSystemDefaults,
   isDowntimeNeedsTriage,
   isDowntimeOutOfService,
   missingTicketCreateFields,
-  ticketCreateContractSummary
+  ticketCreateContractSummary,
+  transportCreateDowntimeLevels,
+  transportDowntimeTypeFromText,
+  transportPriorityForDowntimeType
 } from "../src/ticketCreateContract.js";
 
 describe("ticket create contract", () => {
@@ -34,6 +38,23 @@ describe("ticket create contract", () => {
     expect(levels[0].color).toBe("#64748B");
     expect(isDowntimeOutOfService(downtimeLevelOf("critical", { downtimeLevels: levels }))).toBe(true);
     expect(isDowntimeOutOfService(downtimeLevelOf("minor", { downtimeLevels: levels }))).toBe(false);
+  });
+
+  it("uses only configured transport downtime levels for create choices", () => {
+    const config = {
+      downtimeLevels: [
+        SYSTEM_DOWNTIME_NEEDS_TRIAGE,
+        { id: "check", label: "תקלה לטיפול או בדיקה", desc: "ניתן להמשיך לעבוד", prio: "low", color: "#16A34A" },
+        { id: "critical", label: "תקלה קריטית - אין גיבוי", desc: "הכלי מושבת ואין גיבוי", prio: "high", color: "#DC2626", oos: true }
+      ]
+    };
+
+    expect(transportCreateDowntimeLevels(config).map((level) => level.id)).toEqual(["check", "critical"]);
+    expect(ticketCreateContractSummary(config).downtimeLevels.map((level) => level.id)).toEqual(["check", "critical"]);
+    expect(ticketCreateContractSummary(config).systemDowntimeLevels).toEqual([SYSTEM_DOWNTIME_NEEDS_TRIAGE]);
+    expect(transportPriorityForDowntimeType("critical", config)).toBe("high");
+    expect(transportDowntimeTypeFromText("הכלי מושבת ואין גיבוי", config)).toBe("critical");
+    expect(transportCreateDowntimeLevels({}, DEFAULT_TRANSPORT_DOWNTIME_LEVELS).map((level) => level.id)).not.toContain("needs_triage");
   });
 
   it("requires an explicit priority for every ordinary create", () => {

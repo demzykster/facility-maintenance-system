@@ -1,4 +1,9 @@
 import { waitingTargetRequirementForReason } from "./ticketWaitingTargetModel.js";
+import {
+  DEFAULT_TRANSPORT_DOWNTIME_LEVELS,
+  transportDowntimeTypeFromText,
+  transportPriorityForDowntimeType
+} from "./ticketCreateContract.js";
 
 const MAX_SUBJECT_CHARS = 80;
 const MAX_DESCRIPTION_CHARS = 1200;
@@ -122,10 +127,11 @@ function missingFieldsForTicketPayload(payload = {}, draft = {}) {
   if (!payload.track) missing.push("track");
   if (!payload.subject) missing.push("subject");
   if (!payload.description) missing.push("description");
-  if (!payload.priority) missing.push("priority");
+  if (payload.track !== "transport" && !payload.priority) missing.push("priority");
   if (payload.track === "facility" && !payload.zone) missing.push("zone");
   if (payload.track === "transport" && !payload.forkliftId) missing.push("forkliftId");
   if (payload.track === "transport" && !payload.downtimeType) missing.push("downtimeType");
+  if (payload.track === "transport" && payload.downtimeType && !payload.priority) missing.push("downtimeType");
   if (draft.module === "unknown") missing.push("module");
   return [...new Set(missing)];
 }
@@ -174,15 +180,6 @@ function requestedTaskStatusFromText(text = "") {
     if (/בוטל|בטל|cancel/i.test(raw)) return "cancelled";
     if (/חדש|פתוח|todo|open/i.test(raw)) return "todo";
   }
-  return "";
-}
-
-function requestedDowntimeTypeFromText(text = "") {
-  const raw = cleanText(text, 800).toLowerCase();
-  if (!raw) return "";
-  if (/יש\s+תחליף|קיים\s+תחליף|תחליף\s+זמין|with\s+replacement|replacement\s+available|backup\s+available|spare\s+available/i.test(raw)) return "has_replacement";
-  if (/אין\s+תחליף|ללא\s+תחליף|מושבת(?:ת)?\s+ואין|הכלי\s+מושבת|מוציא(?:ה)?\s+מכלל\s+שימוש|השבתה\s+קריטית|out\s+of\s+service|no\s+replacement|no\s+spare|critical\s+downtime/i.test(raw)) return "critical";
-  if (/ניתן\s+להמשיך\s+לעבוד|אפשר\s+להמשיך\s+לעבוד|לא\s+מוציא(?:ה)?\s+מכלל\s+שימוש|לא\s+מושבת|minor\s+downtime|minor|can\s+continue/i.test(raw)) return "minor";
   return "";
 }
 
@@ -680,11 +677,15 @@ export function buildAiTicketCreatePayload({ draft = {}, user = {}, now = Date.n
   const module = cleanText(draft.module, 40);
   const track = ticketTrackForModule(module);
   const location = locationFromDraft(draft);
-  const downtimeType = track === "transport" ? requestedDowntimeTypeFromText(draft.rawText) : "";
+  const downtimeType = track === "transport"
+    ? transportDowntimeTypeFromText(draft.rawText, context.config || {}, DEFAULT_TRANSPORT_DOWNTIME_LEVELS)
+    : "";
   const category = ticketCategoryForDraft(draft, track);
   const subject = ticketSubjectFromDraft(draft, { track, location });
   const description = ticketDescriptionFromDraft(draft, { track, category });
-  const priority = ticketPriorityForDraft({ draft });
+  const priority = track === "transport"
+    ? transportPriorityForDowntimeType(downtimeType, context.config || {}, DEFAULT_TRANSPORT_DOWNTIME_LEVELS)
+    : ticketPriorityForDraft({ draft });
   const createdAt = Number.isFinite(Number(now)) ? Number(now) : Date.now();
   const fleetUnit = track === "transport" ? draftFleetUnitFromText(draft.rawText, context.fleet) : null;
   const fleetAsset = fleetUnit ? cleanText(fleetUnit.code || fleetUnit.num || fleetUnit.number || fleetUnit.asset || fleetUnit.unitCode || fleetUnit.workerNo || fleetUnit.vehicleNumber || fleetUnit.licensePlate || fleetUnit.displayNumber || fleetUnit.id, 160) : "";

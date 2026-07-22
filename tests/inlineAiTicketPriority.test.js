@@ -5,7 +5,7 @@ import { buildInlineTicketIntakePlan } from "../src/inlineAiTicketIntakeOrchestr
 const user = { id: "user-1", name: "Vadim", role: "user", dept: "הפצה" };
 
 describe("inline AI ticket priority", () => {
-  it("asks for transport priority after resolving the asset and accepts an explicit follow-up", () => {
+  it("derives transport priority from the configured vehicle condition instead of asking for generic priority", () => {
     const context = { fleet: [{ id: "fleet-226", code: "226", department: "הפצה" }] };
     const first = buildInlineTicketIntakePlan({
       text: "תקלה במלגזה 226",
@@ -14,20 +14,8 @@ describe("inline AI ticket priority", () => {
       user
     });
 
-    expect(first).toMatchObject({ domain: "transport", status: "collecting", pendingField: "priority" });
-    expect(first.draft).toMatchObject({ forkliftId: "fleet-226", priority: "" });
-    expect(first.ticket).toBeUndefined();
-
-    const ready = buildInlineTicketIntakePlan({
-      text: "בינונית",
-      latestText: "בינונית",
-      previousIntake: first,
-      context,
-      fullVisibleFleet: context.fleet,
-      user
-    });
-
-    expect(ready).toMatchObject({ status: "ready", pendingField: "", ticket: { track: "transport", priority: "medium", forkliftId: "fleet-226" } });
+    expect(first).toMatchObject({ domain: "transport", status: "ready", pendingField: "" });
+    expect(first.ticket).toMatchObject({ track: "transport", downtimeType: "minor", priority: "low", forkliftId: "fleet-226" });
   });
 
   it("asks for facility priority without losing resolved category or location", () => {

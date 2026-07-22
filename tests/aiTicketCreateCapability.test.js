@@ -47,17 +47,20 @@ async function execute(text, options = {}) {
 }
 
 describe("AI ticket.create capability", () => {
-  it("blocks autonomous create until priority is explicit", async () => {
+  it("creates ordinary transport reports with a configured vehicle condition instead of generic priority", async () => {
     const text = "Не работает вентилятор на машине 226";
     const { result, driver } = await execute(text, { latestText: text });
 
     expect(result).toMatchObject({
-      executionStatus: "blocked",
-      unknowns: ["priority"],
-      blockingQuestion: "מה העדיפות: גבוהה, בינונית או נמוכה?",
-      intake: { domain: "transport", pendingField: "priority", draft: { priority: "" } }
+      executionStatus: "created",
+      unknowns: [],
+      blockingQuestion: "",
+      intake: { domain: "transport", pendingField: "", draft: { downtimeType: "minor", priority: "low" } }
     });
-    expect(driver.create).not.toHaveBeenCalled();
+    expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({
+      downtimeType: "minor",
+      priority: "low"
+    }), expect.any(Object));
   });
 
   it("creates a simple transport ticket without extra duplicate lookup or diagnosis", async () => {
@@ -72,10 +75,10 @@ describe("AI ticket.create capability", () => {
       forkliftId: "forklift-226",
       subject: "Не работает вентилятор на машине 226",
       description: "Не работает вентилятор на машине 226",
-      downtimeType: "needs_triage",
-      priority: "medium",
+      downtimeType: "minor",
+      priority: "low",
       department: "Ops",
-      dueAt: 1000 + 24 * 3600000
+      dueAt: 1000 + 72 * 3600000
     }), expect.objectContaining({ idempotencyKey: "idem-1" }));
     expect(result.toolResults.map((tool) => tool.capability)).toEqual([
       "get_current_user_context",
@@ -121,7 +124,8 @@ describe("AI ticket.create capability", () => {
     expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({
       track: "transport",
       description: "במלגזה 210 ראש קילש לא עובד",
-      priority: "medium"
+      priority: "low",
+      downtimeType: "minor"
     }), expect.any(Object));
   });
 
@@ -453,7 +457,7 @@ describe("AI ticket.create capability", () => {
   });
 
   it("treats controlled smoke test wording as a rollout label, not a smoke hazard", async () => {
-    const { result, driver } = await execute("Создай тестовую транспортную заявку для 226: Controlled autonomous AI smoke test.");
+    const { result, driver } = await execute("Создай тестовую транспортную заявку для 226: תקלה לטיפול או בדיקה. Controlled autonomous AI smoke test.");
 
     expect(result.executionStatus).toBe("created");
     expect(result.actionResult).toMatchObject({ ticketId: "ticket-226", ticketNumber: "T-1842" });

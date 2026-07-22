@@ -445,7 +445,7 @@ describe("AI assist action model", () => {
         status: "needs_form_review",
         requiresConfirmation: true,
         writesData: false,
-        missingFields: ["priority", "downtimeType"],
+        missingFields: ["downtimeType"],
         reviewMode: "ticket_form",
         payload: expect.objectContaining({
           track: "transport",
@@ -479,16 +479,16 @@ describe("AI assist action model", () => {
       expect.objectContaining({
         id: "create_ticket",
         type: "ticket.create",
-        status: "needs_form_review",
+        status: "ready_for_confirmation",
         requiresConfirmation: true,
         writesData: false,
-        missingFields: ["priority"],
+        missingFields: [],
         payload: expect.objectContaining({
           track: "transport",
           forkliftId: "fleet-120823",
           asset: "120823",
           downtimeType: "critical",
-          priority: ""
+          priority: "high"
         })
       })
     ]);
@@ -516,12 +516,12 @@ describe("AI assist action model", () => {
       expect.objectContaining({
         id: "create_ticket",
         type: "ticket.create",
-        status: "needs_form_review",
-        missingFields: ["priority"],
+        status: "ready_for_confirmation",
+        missingFields: [],
         payload: expect.objectContaining({
           forkliftId: "fleet-120823",
           downtimeType: "has_replacement",
-          priority: ""
+          priority: "medium"
         })
       })
     ]);

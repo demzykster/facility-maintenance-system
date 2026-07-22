@@ -145,7 +145,7 @@ describe("AI assist handler", () => {
         actionResult: { type: "ticket.create", ticketId: "ticket-226", num: 1842, ticketNumber: "T-1842", ticketNo: "T-1842" }
       }
     });
-    expect(ticketsDriver.create).toHaveBeenCalledWith(expect.objectContaining({ downtimeType: "needs_triage" }), expect.objectContaining({
+    expect(ticketsDriver.create).toHaveBeenCalledWith(expect.objectContaining({ downtimeType: "minor", priority: "low" }), expect.objectContaining({
       idempotencyKey: "idem-226"
     }));
     expect(providerCall).not.toHaveBeenCalled();
@@ -1823,7 +1823,7 @@ describe("AI assist handler", () => {
         status: "needs_form_review",
         requiresConfirmation: true,
         writesData: false,
-        missingFields: ["priority", "downtimeType"],
+        missingFields: ["downtimeType"],
         reviewMode: "ticket_form",
         payload: expect.objectContaining({
           track: "transport",
@@ -1839,7 +1839,7 @@ describe("AI assist handler", () => {
       readyActionCount: 0,
       reviewInFormCount: 1,
       actionTypes: ["ticket.create"],
-      missingFields: ["priority", "downtimeType"]
+      missingFields: ["downtimeType"]
     });
     expect(prompt.actionGuidance.instruction).toContain("should be completed in the normal CMMS form");
     expect(prompt.actionGuidance.instruction).toContain("Do not ask a chat follow-up");
@@ -1882,16 +1882,16 @@ describe("AI assist handler", () => {
       expect.objectContaining({
         id: "create_ticket",
         type: "ticket.create",
-        status: "needs_form_review",
+        status: "ready_for_confirmation",
         requiresConfirmation: true,
         writesData: false,
-        missingFields: ["priority"],
+        missingFields: [],
         payload: expect.objectContaining({
           track: "transport",
           forkliftId: "fleet-120823",
           asset: "120823",
           downtimeType: "critical",
-          priority: ""
+          priority: "high"
         })
       })
     ]);
