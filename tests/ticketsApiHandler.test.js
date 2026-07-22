@@ -2065,6 +2065,41 @@ describe("tickets API handler", () => {
     expect(auditDriver.write).not.toHaveBeenCalled();
   });
 
+  it("rejects generic priority updates for transport tickets", async () => {
+    const existing = ticketRecord({
+      id: "T-priority-unsupported",
+      track: "transport",
+      forkliftId: "forklift-210",
+      category: "transport",
+      priority: "high",
+      downtimeType: "critical",
+      createdAt: 1000,
+      dueAt: 2000
+    });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn()
+    };
+    const auditDriver = { write: vi.fn() };
+    const handler = createTicketsApiHandler({
+      driver,
+      auditDriver,
+      configDriver: { get: vi.fn().mockResolvedValue({ config: {} }) },
+      fleetDriver: { list: vi.fn().mockResolvedValue([]) },
+      sessionClient: sessionClientFor({ id: "admin-1", role: "admin", name: "Vadim", permissions: { tickets: "manage" } })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: { operation: "priority", ticket: { id: "T-priority-unsupported", priority: "low" } }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "ticket_priority_update_unsupported_track" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+    expect(auditDriver.write).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["technician", pinSessionClientFor({ role: "tech", name: "שרון", supplier: "טויוטה" }), null, "Bearer cmms-token"],
     ["ordinary manager", null, sessionClientFor({ role: "user", permissions: { tickets: "manage" } }), "Bearer user-token"],

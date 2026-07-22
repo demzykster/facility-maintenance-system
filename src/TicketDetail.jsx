@@ -365,6 +365,7 @@ export function TicketDetail(p) {
     ? (String(ticket.assignee || "").trim() || "מנהל המערכת")
     : ticketResponsibleLabel(ticket, { fleet: p.fleet || [] });
   const approvalContext = getTicketApprovalContext(ticket, { fleet: p.fleet || [], users: p.users || [] });
+  const canEditPriority = isAdmin && track === "facility";
   const showAdminProcessingPanel = role === "admin" && isOpen(ticket) && !["pending_manager", "pending_user", "rework"].includes(ticket.status);
   const showTransportExecutionToggle = track === "transport" && !["pending_admin", "pending_user"].includes(ticket.status);
   const dtMeta = ticket.downtimeType ? dtOf(ticket.downtimeType) : null;
@@ -406,7 +407,7 @@ export function TicketDetail(p) {
       <div className="detail-top">
         <span className="badge" style={{ color: s.color, background: s.bg }}>{s.label}</span>
         <span className="badge" style={{ color: tr.color, background: tr.color + "1f" }}><tr.Icon size={11} /> {tr.short}</span>
-        {isAdmin ? <button type="button" className="badge badge-btn" style={{ color: pr.color, background: pr.bg }} onClick={() => setAdminQuickEdit("priority")} aria-label="עריכת עדיפות">{pr.label}</button> : <span className="badge" style={{ color: pr.color, background: pr.bg }}>{pr.label}</span>}
+        {track === "facility" && (canEditPriority ? <button type="button" className="badge badge-btn" style={{ color: pr.color, background: pr.bg }} onClick={() => setAdminQuickEdit("priority")} aria-label="עריכת עדיפות">{pr.label}</button> : <span className="badge" style={{ color: pr.color, background: pr.bg }}>{pr.label}</span>)}
         {ticketMissedSla(ticket, config) && <span className="badge ovd"><AlertTriangle size={12} /> SLA</span>}
         {ticket.closure && <span className="badge" style={{ color: "#047857", background: "#D1FAE5" }}><PenLine size={11} /> חתום</span>}
       </div>
@@ -432,7 +433,7 @@ export function TicketDetail(p) {
         {ticket.status === "waiting" && waitingTarget.type === "date" && waitingTargetLabel && <Meta Icon={CalendarClock} label="חזרה לטיפול" value={waitingTargetLabel} />}
         {approvalContext.isApproval && <Meta Icon={CheckCircle2} label={approvalContext.type === "admin_closure" ? "ממתינה לסגירה" : "ממתינים לאישור"} value={approvalContext.target?.name || "מנהל המחלקה"} />}
         {detailPausedTotal > 0 && <Meta Icon={CalendarClock} label="זמן המתנה (לא נספר ל-SLA)" value={fmtDur(detailPausedTotal)} />}
-        {(() => { const r = computeRisk(ticket, p.fleet || [], config); return r.level !== "green" ? <Meta Icon={AlertTriangle} iconColor={r.color} label="רמת סיכון" value={<span style={{ color: r.color, fontWeight: 700 }}>{r.label}</span>} action={isAdmin ? () => setAdminQuickEdit("priority") : null} /> : null; })()}
+        {(() => { const r = computeRisk(ticket, p.fleet || [], config); return r.level !== "green" ? <Meta Icon={AlertTriangle} iconColor={r.color} label="רמת סיכון" value={<span style={{ color: r.color, fontWeight: 700 }}>{r.label}</span>} action={canEditPriority ? () => setAdminQuickEdit("priority") : null} /> : null; })()}
       </div>
       {isAdmin && adminQuickEdit && <AdminTicketQuickEdit key={adminQuickEdit} field={adminQuickEdit} ticket={ticket} config={config} fleet={p.fleet || []} users={p.users || []} onCancel={() => setAdminQuickEdit("")} onSave={adminQuickEdit === "priority" ? adminPrioritySave : adminQuickSave} />}
       <SectionTitle>תיאור</SectionTitle><div className="desc-box">{ticket.description}</div>

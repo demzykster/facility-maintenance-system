@@ -15,7 +15,8 @@ const numberOrNull = (value) => {
 export const TICKET_PRIORITY_UPDATE_ERRORS = Object.freeze({
   forbidden: "ticket_priority_update_forbidden",
   invalid: "ticket_priority_invalid",
-  slaUnavailable: "ticket_priority_sla_unavailable"
+  slaUnavailable: "ticket_priority_sla_unavailable",
+  unsupportedTrack: "ticket_priority_update_unsupported_track"
 });
 
 export function normalizeTicketPriorityEditValue(value) {
@@ -47,6 +48,9 @@ export function buildTicketPriorityHistoryEntry({ previousPriority, nextPriority
 
 export function applyTicketPriorityUpdate(ticket = {}, priority, { actor = {}, config = {}, fleet = [], now = Date.now() } = {}) {
   if (!canEditTicketPriority(actor)) return { ok: false, error: TICKET_PRIORITY_UPDATE_ERRORS.forbidden };
+  if ((ticket.track || (ticket.forkliftId ? "transport" : "facility")) === "transport") {
+    return { ok: false, error: TICKET_PRIORITY_UPDATE_ERRORS.unsupportedTrack };
+  }
   const nextPriority = normalizeTicketPriorityEditValue(priority);
   if (!nextPriority || !Object.prototype.hasOwnProperty.call(DEFAULT_TICKET_SLA_HOURS, nextPriority)) {
     return { ok: false, error: TICKET_PRIORITY_UPDATE_ERRORS.invalid };

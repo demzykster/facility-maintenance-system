@@ -58,6 +58,20 @@ describe("ticket priority update model", () => {
     expect(result).toEqual({ ok: false, error: "ticket_priority_update_forbidden" });
   });
 
+  it("rejects generic priority edits for transport tickets", () => {
+    const result = applyTicketPriorityUpdate({
+      ...baseTicket,
+      id: "T-priority",
+      track: "transport",
+      forkliftId: "forklift-210",
+      downtimeType: "critical"
+    }, "high", {
+      actor: { role: "admin", name: "Vadim" }
+    });
+
+    expect(result).toEqual({ ok: false, error: "ticket_priority_update_unsupported_track" });
+  });
+
   it("rejects invalid priority values", () => {
     const result = applyTicketPriorityUpdate(baseTicket, "critical", {
       actor: { role: "admin", name: "Vadim" }
