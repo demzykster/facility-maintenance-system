@@ -374,6 +374,7 @@ export function TicketDetail(p) {
   const showAdminProcessingPanel = role === "admin" && isOpen(ticket) && !["pending_manager", "pending_user", "rework"].includes(ticket.status);
   const showTransportExecutionToggle = track === "transport" && !["pending_admin", "pending_user"].includes(ticket.status);
   const dtMeta = ticket.downtimeType ? dtOf(ticket.downtimeType) : null;
+  const transportRiskMeta = track === "transport" ? (dtMeta || { label: "לא הוגדר", color: "#64748B" }) : null;
   const detailLifecycleOptions = {
     now: Date.now(),
     isOpen,
@@ -438,7 +439,7 @@ export function TicketDetail(p) {
         {ticket.status === "waiting" && waitingTarget.type === "date" && waitingTargetLabel && <Meta Icon={CalendarClock} label="חזרה לטיפול" value={waitingTargetLabel} />}
         {approvalContext.isApproval && <Meta Icon={CheckCircle2} label={approvalContext.type === "admin_closure" ? "ממתינה לסגירה" : "ממתינים לאישור"} value={approvalContext.target?.name || "מנהל המחלקה"} />}
         {detailPausedTotal > 0 && <Meta Icon={CalendarClock} label="זמן המתנה (לא נספר ל-SLA)" value={fmtDur(detailPausedTotal)} />}
-        {(() => { const r = computeRisk(ticket, p.fleet || [], config); return r.level !== "green" ? <Meta Icon={AlertTriangle} iconColor={r.color} label="רמת סיכון" value={<span style={{ color: r.color, fontWeight: 700 }}>{r.label}</span>} action={track === "transport" && isAdmin ? () => setAdminQuickEdit("downtimeType") : canEditPriority ? () => setAdminQuickEdit("priority") : null} /> : null; })()}
+        {(() => { const r = computeRisk(ticket, p.fleet || [], config); const meta = transportRiskMeta || r; return track === "transport" || r.level !== "green" ? <Meta Icon={AlertTriangle} iconColor={meta.color} label="רמת סיכון" value={<span style={{ color: meta.color, fontWeight: 700 }}>{meta.label}</span>} action={track === "transport" && isAdmin ? () => setAdminQuickEdit("downtimeType") : canEditPriority ? () => setAdminQuickEdit("priority") : null} /> : null; })()}
       </div>
       {isAdmin && adminQuickEdit && <AdminTicketQuickEdit key={adminQuickEdit} field={adminQuickEdit} ticket={ticket} config={config} fleet={p.fleet || []} users={p.users || []} onCancel={() => setAdminQuickEdit("")} onSave={adminQuickEdit === "priority" ? adminPrioritySave : adminQuickEdit === "downtimeType" ? adminDowntimeSave : adminQuickSave} />}
       <SectionTitle>תיאור</SectionTitle><div className="desc-box">{ticket.description}</div>

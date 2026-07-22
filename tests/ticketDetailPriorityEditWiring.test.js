@@ -18,6 +18,8 @@ describe("ticket detail priority edit wiring", () => {
   });
 
   it("opens a transport downtime editor instead of generic priority values", () => {
+    expect(detailSource).toContain('const transportRiskMeta = track === "transport" ? (dtMeta || { label: "לא הוגדר", color: "#64748B" }) : null;');
+    expect(detailSource).toContain('return track === "transport" || r.level !== "green"');
     expect(detailSource).toContain('track === "transport" && isAdmin ? () => setAdminQuickEdit("downtimeType")');
     expect(detailSource).toContain('downtimeType: "עריכת מצב הכלי"');
     expect(detailSource).toContain('field === "downtimeType"');
