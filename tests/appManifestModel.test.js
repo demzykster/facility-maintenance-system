@@ -3,7 +3,7 @@ import { buildAppManifest } from "../src/appManifestModel.js";
 
 describe("app manifest model", () => {
   it("uses the configured company name while preserving the PWA contract", () => {
-    const manifest = buildAppManifest({ companyName: "  Ogen | עוגן  " });
+    const manifest = buildAppManifest({ companyName: "  Ogen | עוגן  ", siteName: " תפעול אחזקה וניהול " });
 
     expect(manifest).toMatchObject({
       name: "Ogen | עוגן",
@@ -12,7 +12,8 @@ describe("app manifest model", () => {
       scope: "/",
       display: "standalone",
       dir: "rtl",
-      lang: "he"
+      lang: "he",
+      description: "תפעול אחזקה וניהול"
     });
     expect(manifest.icons).toHaveLength(5);
   });

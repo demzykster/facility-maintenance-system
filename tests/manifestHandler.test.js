@@ -25,7 +25,7 @@ describe("dynamic app manifest handler", () => {
   it("is public and exposes only the resolved brand manifest", async () => {
     const configDriver = {
       get: vi.fn().mockResolvedValue({
-        config: { companyName: "Ogen | עוגן", privateNote: "do-not-expose" }
+        config: { companyName: "Ogen | עוגן", siteName: "תפעול אחזקה וניהול", privateNote: "do-not-expose" }
       })
     };
     const res = await call(createManifestHandler({ configDriver }));
@@ -33,7 +33,7 @@ describe("dynamic app manifest handler", () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers["content-type"]).toBe("application/manifest+json; charset=utf-8");
     expect(res.headers["cache-control"]).toBe("public, max-age=0, must-revalidate");
-    expect(JSON.parse(res.body)).toMatchObject({ name: "Ogen | עוגן", short_name: "Ogen | עוגן" });
+    expect(JSON.parse(res.body)).toMatchObject({ name: "Ogen | עוגן", short_name: "Ogen | עוגן", description: "תפעול אחזקה וניהול" });
     expect(res.body).not.toContain("privateNote");
   });
 

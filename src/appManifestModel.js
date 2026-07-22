@@ -1,4 +1,4 @@
-import { brandCompanyName, brandShortName } from "./brandConfigModel.js";
+import { brandCompanyName, brandShortName, brandSiteSubtitle } from "./brandConfigModel.js";
 
 const APP_ICONS = Object.freeze([
   Object.freeze({ src: "/icons/icon-192-brand-20260711.png", sizes: "192x192", type: "image/png", purpose: "any" }),
@@ -12,7 +12,7 @@ export function buildAppManifest(config = {}) {
   return {
     name: brandCompanyName(config),
     short_name: brandShortName(config),
-    description: "ניהול תחזוקה, ציוד, משימות ותפעול",
+    description: brandSiteSubtitle(config),
     start_url: "/",
     scope: "/",
     display: "standalone",

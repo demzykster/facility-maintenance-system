@@ -1,14 +1,19 @@
 import { useEffect } from "react";
-import { applyBrandDocumentMetadata, DEFAULT_COMPANY_NAME } from "./brandConfigModel.js";
+import { applyBrandDocumentMetadata, DEFAULT_COMPANY_NAME, DEFAULT_SITE_SUBTITLE } from "./brandConfigModel.js";
 
 const cleanString = (value) => String(value == null ? "" : value).trim();
 
 export function mergePublicBrandConfig(current = {}, manifest = {}) {
   const publicName = cleanString(manifest.name);
-  if (!publicName) return current;
+  const publicSubtitle = cleanString(manifest.description);
+  if (!publicName && !publicSubtitle) return current;
   const currentName = cleanString(current.companyName);
-  if (currentName && currentName !== DEFAULT_COMPANY_NAME) return current;
-  return { ...current, companyName: publicName };
+  const currentSubtitle = cleanString(current.siteName);
+  const next = { ...current };
+  if (publicName && (!currentName || currentName === DEFAULT_COMPANY_NAME)) next.companyName = publicName;
+  if (publicSubtitle && (!currentSubtitle || currentSubtitle === DEFAULT_SITE_SUBTITLE)) next.siteName = publicSubtitle;
+  if (next.companyName === current.companyName && next.siteName === current.siteName) return current;
+  return next;
 }
 
 export async function fetchPublicBrandManifest({
