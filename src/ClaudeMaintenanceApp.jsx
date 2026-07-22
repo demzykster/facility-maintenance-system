@@ -41,6 +41,7 @@ import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, today
 import { changeProductionPassword, completeProductionInitialPassword, createProductionAuthStore, loginWithProductionPassword, loginWithProductionPin, logoutProductionSession, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionNotificationReadState, updateProductionProfile, validateProductionInitialPassword } from "./productionLoginAdapter.js";
 import { isOperationallyOverdue } from "./slaModel.js";
 import { DEFAULT_TICKET_SLA_HOURS, resolveTicketSlaHours } from "./ticketSlaPolicyModel.js";
+import { applyTicketPriorityUpdate } from "./ticketPriorityUpdateModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 import { findUserDuplicateGroups } from "./userDuplicateModel.js";
 import { createTicketPhotoStorageFromEnv } from "./ticketPhotoStorage.js";
@@ -2944,6 +2945,53 @@ export default function App() {
     notifyTicketPhone(rec, _prev);
     return true;
   };
+  const updateTicketPriority = async (ticketId, priority) => {
+    const existing = tickets.find((ticket) => ticket.id === ticketId);
+    if (!existing) return false;
+    if (NORMALIZED_TICKET_AUTHORITY) {
+      if (typeof NORMALIZED_TICKET_PROVIDER.updatePriority !== "function") {
+        setToast(SAVE_FAILED_MESSAGE);
+        void recordAutomaticAppIssue(ticketAuthorityFailureIssue({
+          action: "priority-update",
+          id: ticketId,
+          message: "Normalized ticket priority API is not available"
+        }));
+        return false;
+      }
+      try {
+        const result = await NORMALIZED_TICKET_PROVIDER.updatePriority(ticketId, priority);
+        const rec = result?.ticket && typeof result.ticket === "object" ? result.ticket : existing;
+        if (result?.action !== "unchanged") {
+          setTickets((rows) => [rec, ...rows.filter((ticket) => ticket.id !== rec.id)].sort((a, b) => b.createdAt - a.createdAt));
+        }
+        return true;
+      } catch (error) {
+        setToast(SAVE_FAILED_MESSAGE);
+        void recordAutomaticAppIssue(ticketAuthorityFailureIssue({
+          action: "priority-update",
+          id: ticketId,
+          message: error?.message || "Normalized ticket priority update failed"
+        }));
+        return false;
+      }
+    }
+    const priorityResult = applyTicketPriorityUpdate(existing, priority, {
+      actor: sessionRef.current || session,
+      config,
+      fleet,
+      now: Date.now()
+    });
+    if (!priorityResult.ok) {
+      setToast(SAVE_FAILED_MESSAGE);
+      return false;
+    }
+    if (!priorityResult.changed) return true;
+    const rec = priorityResult.ticket;
+    if (!await persistShared(`ticket:${rec.id}`, JSON.stringify(rec))) return false;
+    void shadowWriteNormalizedTicket(rec);
+    setTickets((rows) => [rec, ...rows.filter((ticket) => ticket.id !== rec.id)].sort((a, b) => b.createdAt - a.createdAt));
+    return true;
+  };
   const savePm = async (p) => {
     if (NORMALIZED_PM_AUTHORITY) {
       try {
@@ -3722,7 +3770,7 @@ export default function App() {
     });
     setIssueReportOpen(true);
   };
-  const shared = { session: effSession, config, users, tickets, pm, fleet, presence, techNames, zones, rounds, complaints, absences, locations, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, delComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, delPmMany, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: openIssueReport, rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
+  const shared = { session: effSession, config, users, tickets, pm, fleet, presence, techNames, zones, rounds, complaints, absences, locations, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, delComplaint, saveTicket, updateTicketPriority, delTicket, savePm, savePmMany, delPm, delPmMany, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: openIssueReport, rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
   return (
     <div dir={languageDirection(language)} lang={language} className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />
@@ -8464,6 +8512,8 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .tcard-badges .badge,.tcard-badges .risk-badge{border:1px solid rgba(201,205,209,.72);}
 .tcard-time{margin-inline-start:auto;color:var(--muted);font-size:11.5px;}
 .badge{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;}
+.badge-btn{border:0;font-family:inherit;line-height:inherit;cursor:pointer;}
+.badge-btn:focus-visible{outline:2px solid rgba(31,78,140,.35);outline-offset:2px;}
 .badge.sm{font-size:11.5px;padding:3px 9px;}
 .badge.ovd{color:#8F1D1D;background:#F7EAEA;border-color:#D8B7B7;}
 

@@ -13,12 +13,15 @@ import { verifyCmmsSessionToken } from "../session/cmmsSessionToken.js";
 import { kvWritePermissionError } from "../kv/permissionPolicy.js";
 import { createSupabaseTicketsDriverFromEnv } from "./supabaseTicketsDriver.js";
 import { createSupabaseFleetDriverFromEnv } from "../fleet/supabaseFleetDriver.js";
+import { createSupabaseAppConfigDriverFromEnv } from "../settings/supabaseAppConfigDriver.js";
 import { createSupabaseFileMetadataDriverFromEnv } from "../files/supabaseFileMetadataDriver.js";
 import { createSupabaseFileDriverFromEnv } from "../files/supabaseFileDriver.js";
 import { createTicketRecord, createTicketReplayResult, mergeTicketUpdateWithExisting } from "./ticketCreateDomain.js";
 import { ticketLifecycleTransitionError } from "./ticketLifecycleAuthority.js";
 import { ticketServerCreateV2Enabled } from "../../src/ticketServerCreateCutoverModel.js";
 import { canReadTicketInSessionScope, canReadTicketsRole, ticketCreatePermissionError, ticketWritePermissionError, ticketsForSessionReadScope } from "./ticketReadScope.js";
+import { APP_CONFIG_ID } from "../../src/appConfigRecordModel.js";
+import { applyTicketPriorityUpdate } from "../../src/ticketPriorityUpdateModel.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -110,6 +113,20 @@ const ticketWriteAuditEvent = (ticket, actor, action = AUDIT_ACTIONS.update) => 
   metadata: { source: "api/tickets", sourceKvKey: ticket.sourceKvKey || `ticket:${ticket.id}` }
 });
 
+const ticketPriorityAuditEvent = ({ ticket, actor, before, after, at = Date.now() } = {}) => normalizeAuditEvent({
+  at,
+  actorId: actor.id,
+  actorName: actor.name,
+  actorRole: actor.role,
+  entityType: AUDIT_ENTITY_TYPES.ticket,
+  entityId: ticket.id,
+  action: AUDIT_ACTIONS.update,
+  summary: `Ticket priority updated through normalized API: ${ticket.id}`,
+  before,
+  after,
+  metadata: { source: "api/tickets", operation: "priority", sourceKvKey: ticket.sourceKvKey || `ticket:${ticket.id}` }
+});
+
 const ticketDeleteAuditEvent = (ticketId, actor) => normalizeAuditEvent({
   at: Date.now(),
   actorId: actor.id,
@@ -130,6 +147,7 @@ const ticketWriteOperation = (body = {}, req = {}) => {
     .toLowerCase();
   if (["create", "ticket.create"].includes(raw)) return "create";
   if (["update", "ticket.update"].includes(raw)) return "update";
+  if (["priority", "ticket.priority", "priority.update", "ticket.priority.update"].includes(raw)) return "priority";
   return "upsert";
 };
 
@@ -205,12 +223,13 @@ const deleteTicketOwnedFiles = async ({ ticketId, fileDriver, metadataDriver }) 
   return cleanup;
 };
 
-export function createTicketsApiHandler({ driver = null, auditDriver = null, metadataDriver = null, fileDriver = null, fleetDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null, pinSessionClient = null } = {}) {
+export function createTicketsApiHandler({ driver = null, auditDriver = null, metadataDriver = null, fileDriver = null, fleetDriver = null, configDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null, pinSessionClient = null } = {}) {
   const backendDriver = driver || createSupabaseTicketsDriverFromEnv(env, fetchImpl);
   const backendAuditDriver = auditDriver || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
   const backendMetadataDriver = metadataDriver || (env.CMMS_FILE_METADATA_DRIVER === "supabase" ? createSupabaseFileMetadataDriverFromEnv(env, fetchImpl) : null);
   const backendFileDriver = fileDriver || (env.CMMS_FILE_DRIVER === "supabase" ? createSupabaseFileDriverFromEnv(env, fetchImpl) : null);
   const backendFleetDriver = fleetDriver || createSupabaseFleetDriverFromEnv(env, fetchImpl);
+  const backendConfigDriver = configDriver || createSupabaseAppConfigDriverFromEnv(env, fetchImpl);
 
   return async function ticketsApiHandler(req, res) {
     const auth = await authorize(req, env, fetchImpl, sessionClient, pinSessionClient);
@@ -298,11 +317,68 @@ export function createTicketsApiHandler({ driver = null, auditDriver = null, met
             actionResult: replay.result
           });
         }
+        if (operation === "priority" && auth.user.role !== "admin") {
+          return json(res, 403, { error: "ticket_priority_update_forbidden" });
+        }
         const scopePermissionError = await ticketWritePermissionError(auth.user, existing, { fleetDriver: backendFleetDriver, action: "update" });
         if (scopePermissionError) return json(res, 403, { error: scopePermissionError });
         const permissionError = kvWritePermissionError(auth.user, `ticket:${ticket.id}`);
         if (permissionError) return json(res, 403, { error: permissionError });
+        if (operation === "priority") {
+          if (typeof backendDriver.upsert !== "function") return json(res, 503, { error: "tickets_write_not_configured" });
+          if (!backendConfigDriver?.get) return json(res, 503, { error: "app_config_backend_not_configured" });
+          const existingTicket = normalizeTicketRecord(existing?.legacy_payload || existing).legacyPayload;
+          const configRecord = await backendConfigDriver.get(APP_CONFIG_ID);
+          let fleet = [];
+          if (typeof backendFleetDriver?.list === "function") {
+            try {
+              fleet = await backendFleetDriver.list({ limit: 2000 });
+            } catch {
+              fleet = [];
+            }
+          }
+          const now = Date.now();
+          const priorityResult = applyTicketPriorityUpdate(existingTicket, ticket.legacyPayload.priority, {
+            actor: auth.user,
+            config: configRecord?.config || {},
+            fleet,
+            now
+          });
+          if (!priorityResult.ok) {
+            const status = priorityResult.error === "ticket_priority_invalid" ? 400 : priorityResult.error === "ticket_priority_sla_unavailable" ? 409 : 403;
+            return json(res, status, { error: priorityResult.error });
+          }
+          if (!priorityResult.changed) {
+            return json(res, 200, { ok: true, ticket: existingTicket, action: "unchanged" });
+          }
+          const next = normalizeTicketRecord(priorityResult.ticket);
+          const stored = await backendDriver.upsert(next.legacyPayload);
+          const storedTicket = stored?.legacy_payload ? normalizeTicketRecord(stored.legacy_payload).legacyPayload : next.legacyPayload;
+          await writeAuditEvent(backendAuditDriver, ticketPriorityAuditEvent({
+            ticket: next.legacyPayload,
+            actor: auth.user,
+            before: priorityResult.before,
+            after: priorityResult.after,
+            at: now
+          }));
+          return json(res, 200, {
+            ok: true,
+            ticket: {
+              ...storedTicket,
+              id: next.id,
+              status: next.status,
+              num: next.num,
+              sourceKvKey: next.sourceKvKey
+            },
+            action: "priority_updated"
+          });
+        }
         const nextTicket = mergeTicketUpdateWithExisting(ticket.legacyPayload, existing);
+        const existingPriority = normalizeTicketRecord(existing?.legacy_payload || existing).legacyPayload.priority;
+        const requestedPriority = ticket.legacyPayload.priority;
+        if (requestedPriority != null && String(existingPriority || "") !== String(requestedPriority || "")) {
+          return json(res, 403, { error: "ticket_priority_update_requires_priority_operation" });
+        }
         let lifecycleFleet = [];
         if (typeof backendFleetDriver?.list === "function") {
           try {

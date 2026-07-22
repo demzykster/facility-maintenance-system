@@ -100,6 +100,30 @@ describe("api ticket adapter", () => {
     }]);
   });
 
+  it("posts priority updates through the dedicated ticket operation", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(okResponse({ ok: true, action: "priority_updated", ticket: { id: "T-1", priority: "high" } }));
+    const provider = createApiTicketProvider({
+      baseUrl: "https://cmms.example/api",
+      fetchImpl,
+      getAccessToken: () => "access-1"
+    });
+
+    await expect(provider.updatePriority("T-1", "high")).resolves.toMatchObject({ action: "priority_updated" });
+
+    expect(fetchImpl).toHaveBeenCalledWith("https://cmms.example/api/tickets", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer access-1"
+      },
+      body: JSON.stringify({
+        ticket: { id: "T-1", priority: "high" },
+        operation: "priority"
+      })
+    });
+  });
+
   it("throws the API error without hiding the backend reason", async () => {
     const provider = createApiTicketProvider({
       baseUrl: "https://cmms.example/api",

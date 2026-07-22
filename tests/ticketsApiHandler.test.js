@@ -1966,4 +1966,172 @@ describe("tickets API handler", () => {
     expect(fileDriver.delete).toHaveBeenCalledWith("tickets/T-5/after.jpg");
     expect(metadataDriver.markDeletedByOwner).toHaveBeenCalledWith("ticket", "T-5");
   });
+
+  it("lets an admin update ticket priority through the dedicated operation and recalculates SLA", async () => {
+    const HOUR = 3600000;
+    const existing = ticketRecord({
+      id: "F-priority-api",
+      track: "facility",
+      category: "doors",
+      priority: "low",
+      createdAt: 1000,
+      dueAt: 1000 + 72 * HOUR,
+      subject: "Original subject",
+      status: "in_progress",
+      log: [{ at: 1000, by: "Manager", byRole: "user", text: "נפתחה" }]
+    });
+    const driver = {
+      get: vi.fn().mockResolvedValue({ legacy_payload: existing }),
+      upsert: vi.fn().mockImplementation(async (ticket) => ({ legacy_payload: ticket }))
+    };
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const configDriver = { get: vi.fn().mockResolvedValue({ config: { catSla: { doors: { high: 4, medium: 24, low: 72 } } } }) };
+    const handler = createTicketsApiHandler({
+      driver,
+      auditDriver,
+      configDriver,
+      fleetDriver: { list: vi.fn().mockResolvedValue([]) },
+      sessionClient: sessionClientFor({ id: "admin-1", role: "admin", name: "Vadim", permissions: { tickets: "manage" } })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "priority",
+        ticket: { id: "F-priority-api", priority: "high", subject: "Injected subject", status: "cancelled" }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      action: "priority_updated",
+      ticket: {
+        id: "F-priority-api",
+        subject: "Original subject",
+        status: "in_progress",
+        priority: "high",
+        dueAt: 1000 + 4 * HOUR
+      }
+    });
+    const persisted = driver.upsert.mock.calls[0][0];
+    expect(persisted).toMatchObject({
+      id: "F-priority-api",
+      subject: "Original subject",
+      status: "in_progress",
+      priority: "high",
+      dueAt: 1000 + 4 * HOUR
+    });
+    expect(persisted.log).toHaveLength(2);
+    expect(persisted.log[1]).toMatchObject({
+      kind: "priority",
+      priorityBefore: "low",
+      priorityAfter: "high",
+      dueAtBefore: 1000 + 72 * HOUR,
+      dueAtAfter: 1000 + 4 * HOUR
+    });
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: "admin-1",
+      entityId: "F-priority-api",
+      action: "update",
+      before: { priority: "low", dueAt: 1000 + 72 * HOUR },
+      after: { priority: "high", dueAt: 1000 + 4 * HOUR },
+      metadata: expect.objectContaining({ operation: "priority" })
+    }));
+  });
+
+  it("does not persist or audit an unchanged priority update", async () => {
+    const existing = ticketRecord({ id: "F-priority-same", priority: "medium", createdAt: 1000, dueAt: 2000 });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn()
+    };
+    const auditDriver = { write: vi.fn() };
+    const handler = createTicketsApiHandler({
+      driver,
+      auditDriver,
+      configDriver: { get: vi.fn().mockResolvedValue({ config: {} }) },
+      sessionClient: sessionClientFor({ role: "admin", permissions: { tickets: "manage" } })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: { operation: "priority", ticket: { id: "F-priority-same", priority: "medium" } }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: true, action: "unchanged", ticket: { id: "F-priority-same", priority: "medium" } });
+    expect(driver.upsert).not.toHaveBeenCalled();
+    expect(auditDriver.write).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["technician", pinSessionClientFor({ role: "tech", name: "שרון", supplier: "טויוטה" }), null, "Bearer cmms-token"],
+    ["ordinary manager", null, sessionClientFor({ role: "user", permissions: { tickets: "manage" } }), "Bearer user-token"],
+    ["supplier user", null, sessionClientFor({ role: "supplier", permissions: { tickets: "manage" } }), "Bearer user-token"]
+  ])("rejects %s priority updates", async (_label, pinSessionClient, sessionClient, authorization) => {
+    const existing = ticketRecord({ id: "F-priority-forbidden", priority: "medium", createdAt: 1000, dueAt: 2000 });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      configDriver: { get: vi.fn().mockResolvedValue({ config: {} }) },
+      sessionClient,
+      pinSessionClient,
+      env: { CMMS_SESSION_SECRET: "secret" }
+    });
+    const token = authorization.includes("cmms-token")
+      ? `Bearer ${signCmmsSessionToken("tech-sharon", "tech", "", "secret").token}`
+      : authorization;
+
+    const res = await call(handler, {
+      headers: { authorization: token },
+      body: { operation: "priority", ticket: { id: "F-priority-forbidden", priority: "high" } }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "ticket_priority_update_forbidden" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid priority values", async () => {
+    const handler = createTicketsApiHandler({
+      driver: {
+        get: vi.fn().mockResolvedValue(ticketRecord({ id: "F-priority-invalid", priority: "medium" })),
+        upsert: vi.fn()
+      },
+      configDriver: { get: vi.fn().mockResolvedValue({ config: {} }) },
+      sessionClient: sessionClientFor({ role: "admin", permissions: { tickets: "manage" } })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: { operation: "priority", ticket: { id: "F-priority-invalid", priority: "critical" } }
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: "ticket_priority_invalid" });
+  });
+
+  it("rejects priority changes through the generic update operation", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue(ticketRecord({ id: "F-priority-generic", priority: "medium", status: "new" })),
+      upsert: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ role: "admin", permissions: { tickets: "manage" } })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: { operation: "update", ticket: { id: "F-priority-generic", priority: "high", status: "new" } }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "ticket_priority_update_requires_priority_operation" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
 });

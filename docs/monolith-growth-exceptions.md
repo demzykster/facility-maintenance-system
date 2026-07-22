@@ -102,3 +102,10 @@ Each exception must include:
 - Why necessary: the public login shell still owns the identifier form and production-auth remember option; this owner-requested simplification removes the visible remember-device checkbox while preserving the existing remembered-login behavior as the default.
 - Why extraction was not the right move: extracting the public login form would be broader than this focused UI/auth-preference correction, and the change leaves existing login APIs, session storage adapter, and production auth store contracts intact.
 - Follow-up/removal condition: when the public login form moves into a dedicated module, move this default remember behavior with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
+
+- Date: 2026-07-22
+- Owner goal: narrowly scoped ticket priority edit action.
+- New line count: 10073.
+- Why necessary: ticket detail still receives save callbacks and shell state from `src/ClaudeMaintenanceApp.jsx`; the shell needs a small dedicated `updateTicketPriority` wiring path so the extracted priority update model and normalized ticket API can update only priority, SLA target, and history without routing through generic ticket save behavior.
+- Why extraction was not the right move: the validation and SLA recalculation logic lives in `src/ticketPriorityUpdateModel.js` and the server guard lives in `server/tickets/handler.js`; extracting the whole ticket detail/save surface would be broader than this bounded priority-edit task.
+- Follow-up/removal condition: when ticket detail and ticket save orchestration move into a dedicated ticket module, move this callback wiring and badge focus styling with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.

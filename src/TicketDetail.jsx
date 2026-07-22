@@ -228,7 +228,7 @@ function WaitingTargetEditor({ draft, onChange, suppliers = [], managers = [], t
 
 export function TicketDetail(p) {
   ticketDetailRuntimeUi = p.ui || ticketDetailRuntimeUi;
-  const { ticket, config, session, saveTicket: onUpdate, onBack, onRepeat, onOpenTicket, onAskAI, tickets } = p;
+  const { ticket, config, session, saveTicket: onUpdate, updateTicketPriority, onBack, onRepeat, onOpenTicket, onAskAI, tickets } = p;
   const role = session.role;
   const [photo, setPhoto] = useState(null), [afterPhoto, setAfterPhoto] = useState(null), [note, setNote] = useState(""), [closing, setClosing] = useState(false), [showSim, setShowSim] = useState(false), [returning, setReturning] = useState(false), [recvAt, setRecvAt] = useState("");
   const [adminQuickEdit, setAdminQuickEdit] = useState("");
@@ -317,6 +317,11 @@ export function TicketDetail(p) {
     setAdminQuickEdit("");
     upd(normalizeFacilitySupplierPatch(ticket, patch, session), `עריכת מנהל: ${label}`, "admin_manual");
   };
+  const adminPrioritySave = async (_label, patch) => {
+    setAdminQuickEdit("");
+    if (typeof updateTicketPriority === "function") return updateTicketPriority(ticket.id, patch.priority);
+    return false;
+  };
   const saveFacilityAdminProcessing = () => {
     const now = Date.now();
     const next = applyFacilityAdminProcessingDraft(ticket, facilityAdminDraft, {
@@ -401,7 +406,7 @@ export function TicketDetail(p) {
       <div className="detail-top">
         <span className="badge" style={{ color: s.color, background: s.bg }}>{s.label}</span>
         <span className="badge" style={{ color: tr.color, background: tr.color + "1f" }}><tr.Icon size={11} /> {tr.short}</span>
-        <span className="badge" style={{ color: pr.color, background: pr.bg }}>{pr.label}</span>
+        {isAdmin ? <button type="button" className="badge badge-btn" style={{ color: pr.color, background: pr.bg }} onClick={() => setAdminQuickEdit("priority")} aria-label="עריכת עדיפות">{pr.label}</button> : <span className="badge" style={{ color: pr.color, background: pr.bg }}>{pr.label}</span>}
         {ticketMissedSla(ticket, config) && <span className="badge ovd"><AlertTriangle size={12} /> SLA</span>}
         {ticket.closure && <span className="badge" style={{ color: "#047857", background: "#D1FAE5" }}><PenLine size={11} /> חתום</span>}
       </div>
@@ -427,9 +432,9 @@ export function TicketDetail(p) {
         {ticket.status === "waiting" && waitingTarget.type === "date" && waitingTargetLabel && <Meta Icon={CalendarClock} label="חזרה לטיפול" value={waitingTargetLabel} />}
         {approvalContext.isApproval && <Meta Icon={CheckCircle2} label={approvalContext.type === "admin_closure" ? "ממתינה לסגירה" : "ממתינים לאישור"} value={approvalContext.target?.name || "מנהל המחלקה"} />}
         {detailPausedTotal > 0 && <Meta Icon={CalendarClock} label="זמן המתנה (לא נספר ל-SLA)" value={fmtDur(detailPausedTotal)} />}
-        {(() => { const r = computeRisk(ticket, p.fleet || [], config); return r.level !== "green" ? <div className="meta"><AlertTriangle size={15} color={r.color} /><div><div className="meta-lbl">רמת סיכון</div><div className="meta-val" style={{ color: r.color, fontWeight: 700 }}>{r.label}</div></div></div> : null; })()}
+        {(() => { const r = computeRisk(ticket, p.fleet || [], config); return r.level !== "green" ? <Meta Icon={AlertTriangle} iconColor={r.color} label="רמת סיכון" value={<span style={{ color: r.color, fontWeight: 700 }}>{r.label}</span>} action={isAdmin ? () => setAdminQuickEdit("priority") : null} /> : null; })()}
       </div>
-      {isAdmin && adminQuickEdit && <AdminTicketQuickEdit key={adminQuickEdit} field={adminQuickEdit} ticket={ticket} config={config} fleet={p.fleet || []} users={p.users || []} onCancel={() => setAdminQuickEdit("")} onSave={adminQuickSave} />}
+      {isAdmin && adminQuickEdit && <AdminTicketQuickEdit key={adminQuickEdit} field={adminQuickEdit} ticket={ticket} config={config} fleet={p.fleet || []} users={p.users || []} onCancel={() => setAdminQuickEdit("")} onSave={adminQuickEdit === "priority" ? adminPrioritySave : adminQuickSave} />}
       <SectionTitle>תיאור</SectionTitle><div className="desc-box">{ticket.description}</div>
       {photo && <><SectionTitle>תמונה</SectionTitle><img className="detail-photo" src={photo} alt="" /></>}
       {afterPhoto && <><SectionTitle><CheckCircle2 size={15} /> תמונת ביצוע</SectionTitle><img className="detail-photo" src={afterPhoto} alt="" /></>}
