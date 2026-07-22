@@ -37,6 +37,11 @@ describe("safe visual presentation wiring", () => {
     expect(appSource).toContain("onClick={() => setPub(true)}");
     expect(appSource).not.toContain("QR login");
     expect(appSource).not.toContain("כניסה באמצעות QR");
+    expect(appSource).toContain(".login-visual-copy span{font-family:var(--font-head);font-size:15px;font-weight:800;letter-spacing:0;text-transform:none;color:rgba(255,255,255,.88);}");
+    expect(appSource).toContain(".pub-entry b{display:block;font-family:var(--font-head);font-size:15px;font-weight:800;line-height:1.25;color:var(--ink);}");
+    expect(appSource).toContain("@media (min-width:861px){.login-public-panel>.pub-entry{display:none;}.login-public-panel>.login-foot{margin-top:4px;}}");
+    expect(appSource).toContain(".login-public-panel>.pub-entry{order:2;}");
+    expect(appSource).toContain(".login-public-panel>.login-foot{order:3;}");
   });
 
   it("uses a local optimized warehouse asset for the public visual panel", () => {
