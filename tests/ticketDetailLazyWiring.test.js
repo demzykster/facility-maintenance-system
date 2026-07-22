@@ -37,4 +37,13 @@ describe("ticket detail lazy wiring", () => {
       expect(appSource).toContain(`${required},`);
     }
   });
+
+  it("uses the category-aware supplier filter for facility closure costs", () => {
+    expect(ticketDetailSource).toContain('import { supplierCandidatesForTicket } from "./ticketSupplierFilterModel.js";');
+    expect(ticketDetailSource).toContain("<CloseModal ticket={ticket} config={config} fleet={p.fleet || []}");
+    expect(ticketDetailSource).toContain("const categorySupplierOptions = supplierCandidatesForTicket(config, ticket, fleet || [])");
+    expect(ticketDetailSource).toContain("categorySupplierOptions.includes(ticket.supplier)");
+    expect(ticketDetailSource).not.toContain("const supplierOptions = config.suppliers || []");
+    expect(ticketDetailSource).not.toContain('uiFn("supplierCandidatesForTicket")');
+  });
 });

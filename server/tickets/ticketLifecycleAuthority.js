@@ -9,6 +9,7 @@ const clean = (value) => String(value ?? "").trim();
 
 const TERMINAL_STATUS = new Set(["done", "cancelled"]);
 const TECHNICAL_RETURN_STATUSES = new Set(["rework", "pending_user", "pending_admin", "waiting"]);
+const FACILITY_ADMIN_DIRECT_CLOSE_STATUSES = new Set(["new", "in_progress", "waiting"]);
 
 const ALLOWED_TRANSITIONS = Object.freeze({
   pending_manager: Object.freeze(["new", "rework", "cancelled"]),
@@ -179,9 +180,17 @@ function pendingAdminTransitionError(actor = {}, previousTicket = {}, nextTicket
   return facilityManagerFinish ? null : "ticket_transition_required_fields_missing:manager_approval";
 }
 
+function isFacilityAdminDirectClose(actor = {}, previousTicket = {}, nextTicket = {}) {
+  return ticketTrack(previousTicket) === "facility"
+    && statusOf(nextTicket) === "done"
+    && FACILITY_ADMIN_DIRECT_CLOSE_STATUSES.has(statusOf(previousTicket))
+    && roleOf(actor) === "admin";
+}
+
 function doneTransitionError(actor = {}, previousTicket = {}, nextTicket = {}) {
   if (statusOf(nextTicket) !== "done") return null;
-  if (transitionKey(previousTicket, nextTicket) !== "pending_admin:done") return null;
+  const key = transitionKey(previousTicket, nextTicket);
+  if (key !== "pending_admin:done" && !isFacilityAdminDirectClose(actor, previousTicket, nextTicket)) return null;
   const closure = nextTicket.closure || {};
   if (!clean(nextTicket.closedAt || closure.signedAt) || !clean(closure.signedBy) || !clean(closure.quality)) {
     return "ticket_transition_required_fields_missing:closure";
@@ -261,7 +270,8 @@ export function ticketLifecycleTransitionError(actor = {}, previousTicket = {}, 
   const from = statusOf(previousTicket);
   const to = statusOf(nextTicket);
   if (TERMINAL_STATUS.has(from)) return "ticket_transition_from_terminal_forbidden";
-  if (!allowedByMatrix(from, to)) return `ticket_transition_forbidden:${from}:${to}`;
+  const facilityAdminDirectClose = isFacilityAdminDirectClose(actor, previousTicket, nextTicket);
+  if (!allowedByMatrix(from, to) && !facilityAdminDirectClose) return `ticket_transition_forbidden:${from}:${to}`;
   if (!actorCanDriveTransition(actor, previousTicket, nextTicket)) return `ticket_transition_role_forbidden:${roleOf(actor) || "unknown"}:${from}:${to}`;
   return transportRoutingError(actor, previousTicket, nextTicket, options)
     || transportPreAcceptanceWaitingError(actor, previousTicket, nextTicket, options)

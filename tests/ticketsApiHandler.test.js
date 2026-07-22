@@ -912,8 +912,69 @@ describe("tickets API handler", () => {
     });
   });
 
+  it("allows admin to close active facility tickets with closure fields", async () => {
+    const existing = ticketRecord({ id: "F-active-close", status: "in_progress", track: "facility", category: "doors" });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn().mockImplementation(async (ticket) => ({ legacy_payload: ticket })),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ role: "admin", name: "Admin", permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "update",
+        ticket: {
+          ...existing,
+          status: "done",
+          closedAt: 3_000,
+          closure: { signedAt: 3_000, recordedAt: 4_000, signedBy: "Admin", costAmount: 0, quality: "resolved" }
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      id: "F-active-close",
+      status: "done",
+      closedAt: 3_000,
+      closure: expect.objectContaining({ signedBy: "Admin", quality: "resolved" })
+    }));
+  });
+
+  it("rejects active facility close without closure fields", async () => {
+    const existing = ticketRecord({ id: "F-active-close-missing", status: "in_progress", track: "facility", category: "doors" });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn(),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ role: "admin", name: "Admin", permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "update",
+        ticket: { ...existing, status: "done" }
+      }
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: "ticket_transition_required_fields_missing:closure" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
   it("rejects arbitrary status jumps on normalized ticket updates", async () => {
-    const existing = ticketRecord({ id: "F-jump", status: "new", track: "facility" });
+    const existing = ticketRecord({ id: "T-jump", status: "new", track: "transport", forkliftId: "fork-ops", supplier: "Toyota" });
     const driver = {
       get: vi.fn().mockResolvedValue(existing),
       upsert: vi.fn(),
@@ -929,7 +990,7 @@ describe("tickets API handler", () => {
       headers: { authorization: "Bearer user-token" },
       body: {
         operation: "update",
-        ticket: { ...existing, status: "done" }
+        ticket: { ...existing, status: "done", closedAt: 3_000, closure: { signedAt: 3_000, signedBy: "Admin", quality: "resolved" } }
       }
     });
 

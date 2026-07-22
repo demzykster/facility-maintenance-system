@@ -3,6 +3,7 @@ import { closedTicketRecord } from "./ticketClosureModel.js";
 import { deleteTicketAndClose } from "./ticketDeletionModel.js";
 import { ticketResponsibleLabel, transportTicketSupplierName as transportTicketSupplierNameModel } from "./ticketResponsibilityModel.js";
 import { getTicketApprovalContext } from "./ticketListSemanticModel.js";
+import { supplierCandidatesForTicket } from "./ticketSupplierFilterModel.js";
 import {
   buildTicketWaitingTargetPatch,
   readTicketWaitingTarget,
@@ -107,7 +108,6 @@ const similarTickets = uiFn("similarTickets");
 const slaForTicket = uiFn("slaForTicket");
 const stOf = uiFn("stOf");
 const statusMsToHours = uiFn("statusMsToHours");
-const supplierCandidatesForTicket = uiFn("supplierCandidatesForTicket");
 const ticketAiPrompt = uiFn("ticketAiPrompt");
 const ticketMissedSla = uiFn("ticketMissedSla");
 const ticketNo = uiFn("ticketNo");
@@ -563,7 +563,7 @@ export function TicketDetail(p) {
       <div className="timeline">{[...(ticket.log || [])].reverse().map((l, i) => <div className="tl-item" key={i}><div className="tl-dot" /><div className="tl-body"><div className="tl-text">{l.text}</div><div className="tl-meta">{l.by} · {fmtDate(l.at)} {fmtTime(l.at)}</div></div></div>)}</div>
       <div style={{ height: 24 }} />
     </div>
-    {closing && <CloseModal ticket={ticket} config={config} session={session} onCancel={() => setClosing(false)} onClose={doClose} />}
+    {closing && <CloseModal ticket={ticket} config={config} fleet={p.fleet || []} session={session} onCancel={() => setClosing(false)} onClose={doClose} />}
   </div>);
 }
 
@@ -753,9 +753,14 @@ function AdminTicketQuickEdit({ field, ticket, config, fleet, users = [], onCanc
   </div>;
 }
 
-function CloseModal({ ticket, config, session, onCancel, onClose }) {
-  const supplierOptions = config.suppliers || [];
-  const [step, setStep] = useState(1), [busy, setBusy] = useState(false), [amount, setAmount] = useState(""), [supplier, setSupplier] = useState(supplierOptions[0] || ""), [note, setNote] = useState(""), [realDt, setRealDt] = useState(""), [quality, setQuality] = useState("resolved");
+function CloseModal({ ticket, config, fleet, session, onCancel, onClose }) {
+  const categorySupplierOptions = supplierCandidatesForTicket(config, ticket, fleet || []);
+  const supplierOptions = Array.from(new Set([
+    ...categorySupplierOptions,
+    ticket.closure?.costSupplier
+  ].filter(Boolean)));
+  const initialSupplier = ticket.closure?.costSupplier || (categorySupplierOptions.includes(ticket.supplier) ? ticket.supplier : "");
+  const [step, setStep] = useState(1), [busy, setBusy] = useState(false), [amount, setAmount] = useState(""), [supplier, setSupplier] = useState(initialSupplier), [note, setNote] = useState(""), [realDt, setRealDt] = useState(""), [quality, setQuality] = useState("resolved");
   const [err, setErr] = useState("");
   const QUALITY = [
     { id: "resolved", label: "טופל לחלוטין", color: "#16A34A" },

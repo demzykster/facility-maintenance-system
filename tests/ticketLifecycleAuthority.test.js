@@ -4,7 +4,7 @@ import { ticketLifecycleTransitionError } from "../server/tickets/ticketLifecycl
 describe("server ticket lifecycle authority", () => {
   const fleet = [{ id: "fork-ops", supplier: "Toyota", depts: ["Ops"] }];
 
-  it("allows admin final close only from pending admin with closure fields", () => {
+  it("allows admin final close from pending admin with closure fields", () => {
     expect(ticketLifecycleTransitionError(
       { role: "admin" },
       { status: "pending_admin" },
@@ -13,9 +13,28 @@ describe("server ticket lifecycle authority", () => {
 
     expect(ticketLifecycleTransitionError(
       { role: "admin" },
-      { status: "new" },
-      { status: "done" }
+      { status: "new", track: "transport", forkliftId: "fork-ops", supplier: "Toyota" },
+      { status: "done", track: "transport", forkliftId: "fork-ops", supplier: "Toyota", closedAt: 3_000, closure: { signedBy: "Admin", signedAt: 3_000, quality: "resolved" } },
+      { fleet }
     )).toBe("ticket_transition_forbidden:new:done");
+  });
+
+  it("allows admin to close active facility tickets with closure fields", () => {
+    for (const status of ["new", "in_progress", "waiting"]) {
+      expect(ticketLifecycleTransitionError(
+        { role: "admin", name: "Admin" },
+        { status, track: "facility", category: "doors" },
+        { status: "done", track: "facility", category: "doors", closedAt: 3_000, closure: { signedBy: "Admin", signedAt: 3_000, quality: "resolved" } }
+      )).toBeNull();
+    }
+  });
+
+  it("rejects direct facility admin close without closure fields", () => {
+    expect(ticketLifecycleTransitionError(
+      { role: "admin", name: "Admin" },
+      { status: "in_progress", track: "facility", category: "doors" },
+      { status: "done", track: "facility", category: "doors" }
+    )).toBe("ticket_transition_required_fields_missing:closure");
   });
 
   it("rejects admin final close without the existing closure signature fields", () => {
