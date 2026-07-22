@@ -66,6 +66,9 @@ export function createApiTicketProvider({ baseUrl, fetchImpl = globalThis.fetch,
     async updatePriority(id, priority) {
       return postTicket({ id, priority }, "priority");
     },
+    async updateDowntime(id, downtimeType) {
+      return postTicket({ id, downtimeType }, "downtime");
+    },
     async delete(id) {
       await request(`/tickets?id=${encodeURIComponent(id)}`, { method: "DELETE" });
       return true;

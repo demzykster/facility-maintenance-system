@@ -124,6 +124,30 @@ describe("api ticket adapter", () => {
     });
   });
 
+  it("posts transport downtime updates through the dedicated ticket operation", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(okResponse({ ok: true, action: "downtime_updated", ticket: { id: "T-1", downtimeType: "critical" } }));
+    const provider = createApiTicketProvider({
+      baseUrl: "https://cmms.example/api",
+      fetchImpl,
+      getAccessToken: () => "access-1"
+    });
+
+    await expect(provider.updateDowntime("T-1", "critical")).resolves.toMatchObject({ action: "downtime_updated" });
+
+    expect(fetchImpl).toHaveBeenCalledWith("https://cmms.example/api/tickets", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer access-1"
+      },
+      body: JSON.stringify({
+        ticket: { id: "T-1", downtimeType: "critical" },
+        operation: "downtime"
+      })
+    });
+  });
+
   it("throws the API error without hiding the backend reason", async () => {
     const provider = createApiTicketProvider({
       baseUrl: "https://cmms.example/api",

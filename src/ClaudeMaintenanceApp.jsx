@@ -42,6 +42,7 @@ import { changeProductionPassword, completeProductionInitialPassword, createProd
 import { isOperationallyOverdue } from "./slaModel.js";
 import { DEFAULT_TICKET_SLA_HOURS, resolveTicketSlaHours } from "./ticketSlaPolicyModel.js";
 import { applyTicketPriorityUpdate } from "./ticketPriorityUpdateModel.js";
+import { applyTicketDowntimeUpdate } from "./ticketDowntimeUpdateModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 import { findUserDuplicateGroups } from "./userDuplicateModel.js";
 import { createTicketPhotoStorageFromEnv } from "./ticketPhotoStorage.js";
@@ -2988,6 +2989,53 @@ export default function App() {
     setTickets((rows) => [rec, ...rows.filter((ticket) => ticket.id !== rec.id)].sort((a, b) => b.createdAt - a.createdAt));
     return true;
   };
+  const updateTicketDowntime = async (ticketId, downtimeType) => {
+    const existing = tickets.find((ticket) => ticket.id === ticketId);
+    if (!existing) return false;
+    if (NORMALIZED_TICKET_AUTHORITY) {
+      if (typeof NORMALIZED_TICKET_PROVIDER.updateDowntime !== "function") {
+        setToast(SAVE_FAILED_MESSAGE);
+        void recordAutomaticAppIssue(ticketAuthorityFailureIssue({
+          action: "downtime-update",
+          id: ticketId,
+          message: "Normalized ticket downtime API is not available"
+        }));
+        return false;
+      }
+      try {
+        const result = await NORMALIZED_TICKET_PROVIDER.updateDowntime(ticketId, downtimeType);
+        const rec = result?.ticket && typeof result.ticket === "object" ? result.ticket : existing;
+        if (result?.action !== "unchanged") {
+          setTickets((rows) => [rec, ...rows.filter((ticket) => ticket.id !== rec.id)].sort((a, b) => b.createdAt - a.createdAt));
+        }
+        return true;
+      } catch (error) {
+        setToast(SAVE_FAILED_MESSAGE);
+        void recordAutomaticAppIssue(ticketAuthorityFailureIssue({
+          action: "downtime-update",
+          id: ticketId,
+          message: error?.message || "Normalized ticket downtime update failed"
+        }));
+        return false;
+      }
+    }
+    const downtimeResult = applyTicketDowntimeUpdate(existing, downtimeType, {
+      actor: sessionRef.current || session,
+      config,
+      fleet,
+      now: Date.now()
+    });
+    if (!downtimeResult.ok) {
+      setToast(SAVE_FAILED_MESSAGE);
+      return false;
+    }
+    if (!downtimeResult.changed) return true;
+    const rec = downtimeResult.ticket;
+    if (!await persistShared(`ticket:${rec.id}`, JSON.stringify(rec))) return false;
+    void shadowWriteNormalizedTicket(rec);
+    setTickets((rows) => [rec, ...rows.filter((ticket) => ticket.id !== rec.id)].sort((a, b) => b.createdAt - a.createdAt));
+    return true;
+  };
   const savePm = async (p) => {
     if (NORMALIZED_PM_AUTHORITY) {
       try {
@@ -3766,7 +3814,7 @@ export default function App() {
     });
     setIssueReportOpen(true);
   };
-  const shared = { session: effSession, config, users, tickets, pm, fleet, presence, techNames, zones, rounds, complaints, absences, locations, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, delComplaint, saveTicket, updateTicketPriority, delTicket, savePm, savePmMany, delPm, delPmMany, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: openIssueReport, rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
+  const shared = { session: effSession, config, users, tickets, pm, fleet, presence, techNames, zones, rounds, complaints, absences, locations, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, delComplaint, saveTicket, updateTicketPriority, updateTicketDowntime, delTicket, savePm, savePmMany, delPm, delPmMany, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: openIssueReport, rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
   return (
     <div dir={languageDirection(language)} lang={language} className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />

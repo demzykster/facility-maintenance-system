@@ -228,7 +228,7 @@ function WaitingTargetEditor({ draft, onChange, suppliers = [], managers = [], t
 
 export function TicketDetail(p) {
   ticketDetailRuntimeUi = p.ui || ticketDetailRuntimeUi;
-  const { ticket, config, session, saveTicket: onUpdate, updateTicketPriority, onBack, onRepeat, onOpenTicket, onAskAI, tickets } = p;
+  const { ticket, config, session, saveTicket: onUpdate, updateTicketPriority, updateTicketDowntime, onBack, onRepeat, onOpenTicket, onAskAI, tickets } = p;
   const role = session.role;
   const [photo, setPhoto] = useState(null), [afterPhoto, setAfterPhoto] = useState(null), [note, setNote] = useState(""), [closing, setClosing] = useState(false), [showSim, setShowSim] = useState(false), [returning, setReturning] = useState(false), [recvAt, setRecvAt] = useState("");
   const [adminQuickEdit, setAdminQuickEdit] = useState("");
@@ -320,6 +320,11 @@ export function TicketDetail(p) {
   const adminPrioritySave = async (_label, patch) => {
     setAdminQuickEdit("");
     if (typeof updateTicketPriority === "function") return updateTicketPriority(ticket.id, patch.priority);
+    return false;
+  };
+  const adminDowntimeSave = async (_label, patch) => {
+    setAdminQuickEdit("");
+    if (typeof updateTicketDowntime === "function") return updateTicketDowntime(ticket.id, patch.downtimeType);
     return false;
   };
   const saveFacilityAdminProcessing = () => {
@@ -433,9 +438,9 @@ export function TicketDetail(p) {
         {ticket.status === "waiting" && waitingTarget.type === "date" && waitingTargetLabel && <Meta Icon={CalendarClock} label="חזרה לטיפול" value={waitingTargetLabel} />}
         {approvalContext.isApproval && <Meta Icon={CheckCircle2} label={approvalContext.type === "admin_closure" ? "ממתינה לסגירה" : "ממתינים לאישור"} value={approvalContext.target?.name || "מנהל המחלקה"} />}
         {detailPausedTotal > 0 && <Meta Icon={CalendarClock} label="זמן המתנה (לא נספר ל-SLA)" value={fmtDur(detailPausedTotal)} />}
-        {(() => { const r = computeRisk(ticket, p.fleet || [], config); return r.level !== "green" ? <Meta Icon={AlertTriangle} iconColor={r.color} label="רמת סיכון" value={<span style={{ color: r.color, fontWeight: 700 }}>{r.label}</span>} action={canEditPriority ? () => setAdminQuickEdit("priority") : null} /> : null; })()}
+        {(() => { const r = computeRisk(ticket, p.fleet || [], config); return r.level !== "green" ? <Meta Icon={AlertTriangle} iconColor={r.color} label="רמת סיכון" value={<span style={{ color: r.color, fontWeight: 700 }}>{r.label}</span>} action={track === "transport" && isAdmin ? () => setAdminQuickEdit("downtimeType") : canEditPriority ? () => setAdminQuickEdit("priority") : null} /> : null; })()}
       </div>
-      {isAdmin && adminQuickEdit && <AdminTicketQuickEdit key={adminQuickEdit} field={adminQuickEdit} ticket={ticket} config={config} fleet={p.fleet || []} users={p.users || []} onCancel={() => setAdminQuickEdit("")} onSave={adminQuickEdit === "priority" ? adminPrioritySave : adminQuickSave} />}
+      {isAdmin && adminQuickEdit && <AdminTicketQuickEdit key={adminQuickEdit} field={adminQuickEdit} ticket={ticket} config={config} fleet={p.fleet || []} users={p.users || []} onCancel={() => setAdminQuickEdit("")} onSave={adminQuickEdit === "priority" ? adminPrioritySave : adminQuickEdit === "downtimeType" ? adminDowntimeSave : adminQuickSave} />}
       <SectionTitle>תיאור</SectionTitle><div className="desc-box">{ticket.description}</div>
       {photo && <><SectionTitle>תמונה</SectionTitle><img className="detail-photo" src={photo} alt="" /></>}
       {afterPhoto && <><SectionTitle><CheckCircle2 size={15} /> תמונת ביצוע</SectionTitle><img className="detail-photo" src={afterPhoto} alt="" /></>}
@@ -679,6 +684,7 @@ function AdminTicketQuickEdit({ field, ticket, config, fleet, users = [], onCanc
   const supplierOptions = supplierCandidatesForTicket(config, ticket, fleet || []);
   const zoneOptions = Array.from(new Set([ticket.zone, ...(config.zones || [])].filter(Boolean)));
   const fleetOptions = (fleet || []).filter((unit) => unit?.id || unit?.code || unit?.license || unit?.chassis);
+  const downtimeOptions = dtLevels(config);
   const assigneeOptions = Array.from(new Set([
     ticket.assignee,
     ...users
@@ -688,6 +694,7 @@ function AdminTicketQuickEdit({ field, ticket, config, fleet, users = [], onCanc
   const [value, setValue] = useState(() => {
     if (field === "category") return ticket.category || "";
     if (field === "priority") return ticket.priority || "medium";
+    if (field === "downtimeType") return downtimeOptions.some((item) => item.id === ticket.downtimeType) ? ticket.downtimeType : (downtimeOptions[0]?.id || "");
     if (field === "zone") return ticket.zone || "";
     if (field === "asset") return track === "transport" ? (ticket.forkliftId || "") : (ticket.asset || "");
     if (field === "assignee") return ticket.assignee || "";
@@ -697,6 +704,7 @@ function AdminTicketQuickEdit({ field, ticket, config, fleet, users = [], onCanc
   const title = {
     category: "עריכת קטגוריה",
     priority: "עריכת עדיפות",
+    downtimeType: "עריכת מצב הכלי",
     zone: "עריכת מיקום",
     asset: track === "transport" ? "עריכת כלי" : "עריכת ציוד",
     assignee: "עריכת אחראי",
@@ -710,6 +718,7 @@ function AdminTicketQuickEdit({ field, ticket, config, fleet, users = [], onCanc
       return;
     }
     if (field === "priority") return onSave("עדיפות", { priority: clean || "medium" });
+    if (field === "downtimeType") return onSave("מצב הכלי", { downtimeType: clean });
     if (field === "zone") return onSave("מיקום", { zone: clean });
     if (field === "asset") {
       const unit = fleetOptions.find((item) => item.id === clean);
@@ -726,6 +735,8 @@ function AdminTicketQuickEdit({ field, ticket, config, fleet, users = [], onCanc
       <select className="ta" value={value} onChange={(e) => setValue(e.target.value)}>{(config.categories || CATEGORIES).map((cat) => <option key={cat.id} value={cat.id}>{cat.label}</option>)}</select>
     ) : field === "priority" ? (
       <select className="ta" value={value} onChange={(e) => setValue(e.target.value)}>{PRIORITIES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}</select>
+    ) : field === "downtimeType" ? (
+      <select className="ta" value={value} onChange={(e) => setValue(e.target.value)}>{downtimeOptions.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select>
     ) : field === "zone" ? (
       <select className="ta" value={value} onChange={(e) => setValue(e.target.value)}>{zoneOptions.map((zone) => <option key={zone} value={zone}>{zone}</option>)}</select>
     ) : field === "asset" && track === "transport" ? (

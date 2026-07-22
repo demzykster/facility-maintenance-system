@@ -22,6 +22,7 @@ import { ticketServerCreateV2Enabled } from "../../src/ticketServerCreateCutover
 import { canReadTicketInSessionScope, canReadTicketsRole, ticketCreatePermissionError, ticketWritePermissionError, ticketsForSessionReadScope } from "./ticketReadScope.js";
 import { APP_CONFIG_ID } from "../../src/appConfigRecordModel.js";
 import { applyTicketPriorityUpdate } from "../../src/ticketPriorityUpdateModel.js";
+import { applyTicketDowntimeUpdate } from "../../src/ticketDowntimeUpdateModel.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -127,6 +128,20 @@ const ticketPriorityAuditEvent = ({ ticket, actor, before, after, at = Date.now(
   metadata: { source: "api/tickets", operation: "priority", sourceKvKey: ticket.sourceKvKey || `ticket:${ticket.id}` }
 });
 
+const ticketDowntimeAuditEvent = ({ ticket, actor, before, after, at = Date.now() } = {}) => normalizeAuditEvent({
+  at,
+  actorId: actor.id,
+  actorName: actor.name,
+  actorRole: actor.role,
+  entityType: AUDIT_ENTITY_TYPES.ticket,
+  entityId: ticket.id,
+  action: AUDIT_ACTIONS.update,
+  summary: `Transport ticket downtime state updated through normalized API: ${ticket.id}`,
+  before,
+  after,
+  metadata: { source: "api/tickets", operation: "downtime", sourceKvKey: ticket.sourceKvKey || `ticket:${ticket.id}` }
+});
+
 const ticketDeleteAuditEvent = (ticketId, actor) => normalizeAuditEvent({
   at: Date.now(),
   actorId: actor.id,
@@ -148,6 +163,7 @@ const ticketWriteOperation = (body = {}, req = {}) => {
   if (["create", "ticket.create"].includes(raw)) return "create";
   if (["update", "ticket.update"].includes(raw)) return "update";
   if (["priority", "ticket.priority", "priority.update", "ticket.priority.update"].includes(raw)) return "priority";
+  if (["downtime", "ticket.downtime", "downtime.update", "ticket.downtime.update", "downtimetype", "ticket.downtimetype"].includes(raw)) return "downtime";
   return "upsert";
 };
 
@@ -317,8 +333,8 @@ export function createTicketsApiHandler({ driver = null, auditDriver = null, met
             actionResult: replay.result
           });
         }
-        if (operation === "priority" && auth.user.role !== "admin") {
-          return json(res, 403, { error: "ticket_priority_update_forbidden" });
+        if ((operation === "priority" || operation === "downtime") && auth.user.role !== "admin") {
+          return json(res, 403, { error: operation === "downtime" ? "ticket_downtime_update_forbidden" : "ticket_priority_update_forbidden" });
         }
         const scopePermissionError = await ticketWritePermissionError(auth.user, existing, { fleetDriver: backendFleetDriver, action: "update" });
         if (scopePermissionError) return json(res, 403, { error: scopePermissionError });
@@ -373,11 +389,65 @@ export function createTicketsApiHandler({ driver = null, auditDriver = null, met
             action: "priority_updated"
           });
         }
+        if (operation === "downtime") {
+          if (typeof backendDriver.upsert !== "function") return json(res, 503, { error: "tickets_write_not_configured" });
+          if (!backendConfigDriver?.get) return json(res, 503, { error: "app_config_backend_not_configured" });
+          const existingTicket = normalizeTicketRecord(existing?.legacy_payload || existing).legacyPayload;
+          const configRecord = await backendConfigDriver.get(APP_CONFIG_ID);
+          let fleet = [];
+          if (typeof backendFleetDriver?.list === "function") {
+            try {
+              fleet = await backendFleetDriver.list({ limit: 2000 });
+            } catch {
+              fleet = [];
+            }
+          }
+          const now = Date.now();
+          const downtimeResult = applyTicketDowntimeUpdate(existingTicket, ticket.legacyPayload.downtimeType, {
+            actor: auth.user,
+            config: configRecord?.config || {},
+            fleet,
+            now
+          });
+          if (!downtimeResult.ok) {
+            const status = downtimeResult.error === "ticket_downtime_update_invalid" ? 400 : downtimeResult.error === "ticket_downtime_update_sla_unavailable" ? 409 : 403;
+            return json(res, status, { error: downtimeResult.error });
+          }
+          if (!downtimeResult.changed) {
+            return json(res, 200, { ok: true, ticket: existingTicket, action: "unchanged" });
+          }
+          const next = normalizeTicketRecord(downtimeResult.ticket);
+          const stored = await backendDriver.upsert(next.legacyPayload);
+          const storedTicket = stored?.legacy_payload ? normalizeTicketRecord(stored.legacy_payload).legacyPayload : next.legacyPayload;
+          await writeAuditEvent(backendAuditDriver, ticketDowntimeAuditEvent({
+            ticket: next.legacyPayload,
+            actor: auth.user,
+            before: downtimeResult.before,
+            after: downtimeResult.after,
+            at: now
+          }));
+          return json(res, 200, {
+            ok: true,
+            ticket: {
+              ...storedTicket,
+              id: next.id,
+              status: next.status,
+              num: next.num,
+              sourceKvKey: next.sourceKvKey
+            },
+            action: "downtime_updated"
+          });
+        }
         const nextTicket = mergeTicketUpdateWithExisting(ticket.legacyPayload, existing);
         const existingPriority = normalizeTicketRecord(existing?.legacy_payload || existing).legacyPayload.priority;
         const requestedPriority = ticket.legacyPayload.priority;
         if (requestedPriority != null && String(existingPriority || "") !== String(requestedPriority || "")) {
           return json(res, 403, { error: "ticket_priority_update_requires_priority_operation" });
+        }
+        const existingDowntimeType = normalizeTicketRecord(existing?.legacy_payload || existing).legacyPayload.downtimeType;
+        const requestedDowntimeType = ticket.legacyPayload.downtimeType;
+        if (requestedDowntimeType != null && String(existingDowntimeType || "") !== String(requestedDowntimeType || "")) {
+          return json(res, 403, { error: "ticket_downtime_update_requires_downtime_operation" });
         }
         let lifecycleFleet = [];
         if (typeof backendFleetDriver?.list === "function") {

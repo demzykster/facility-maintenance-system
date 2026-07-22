@@ -25,7 +25,7 @@ export const ticketSlaBaseAt = (ticket = {}) => {
   return base != null && base >= 0 ? base : null;
 };
 
-export const unitSlaModelCode = (unit = {}) => clean(unit.model || unit.type);
+export const unitSlaModelCode = (unit = {}) => clean(unit?.model || unit?.type);
 
 export function unitSlaTypeName(unit = {}, config = {}) {
   if (!unit) return "";

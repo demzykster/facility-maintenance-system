@@ -2100,6 +2100,124 @@ describe("tickets API handler", () => {
     expect(auditDriver.write).not.toHaveBeenCalled();
   });
 
+  it("lets an admin update transport downtime type through the dedicated operation and recalculates SLA", async () => {
+    const HOUR = 3600000;
+    const existing = ticketRecord({
+      id: "T-downtime-api",
+      track: "transport",
+      category: "transport",
+      forkliftId: "forklift-210",
+      downtimeType: "minor",
+      priority: "low",
+      createdAt: 1000,
+      dueAt: 1000 + 72 * HOUR,
+      subject: "Original subject",
+      status: "in_progress",
+      log: [{ at: 1000, by: "Manager", byRole: "user", text: "נפתחה" }]
+    });
+    const driver = {
+      get: vi.fn().mockResolvedValue({ legacy_payload: existing }),
+      upsert: vi.fn().mockImplementation(async (ticket) => ({ legacy_payload: ticket }))
+    };
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const configDriver = { get: vi.fn().mockResolvedValue({ config: { downtimeLevels: [
+      { id: "minor", label: "תקלה לטיפול או בדיקה", prio: "low", color: "#16A34A" },
+      { id: "critical", label: "תקלה קריטית - אין גיבוי", prio: "high", color: "#DC2626", oos: true }
+    ] } }) };
+    const handler = createTicketsApiHandler({
+      driver,
+      auditDriver,
+      configDriver,
+      fleetDriver: { list: vi.fn().mockResolvedValue([]) },
+      sessionClient: sessionClientFor({ id: "admin-1", role: "admin", name: "Vadim", permissions: { tickets: "manage" } })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "downtime",
+        ticket: { id: "T-downtime-api", downtimeType: "critical", subject: "Injected subject", status: "cancelled" }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      action: "downtime_updated",
+      ticket: {
+        id: "T-downtime-api",
+        subject: "Original subject",
+        status: "in_progress",
+        downtimeType: "critical",
+        priority: "high",
+        dueAt: 1000 + 4 * HOUR
+      }
+    });
+    const persisted = driver.upsert.mock.calls[0][0];
+    expect(persisted).toMatchObject({
+      id: "T-downtime-api",
+      subject: "Original subject",
+      status: "in_progress",
+      downtimeType: "critical",
+      priority: "high",
+      dueAt: 1000 + 4 * HOUR
+    });
+    expect(persisted.log.at(-1)).toMatchObject({
+      kind: "downtime_type",
+      downtimeTypeBefore: "minor",
+      downtimeTypeAfter: "critical",
+      priorityBefore: "low",
+      priorityAfter: "high"
+    });
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: "admin-1",
+      entityId: "T-downtime-api",
+      action: "update",
+      before: { downtimeType: "minor", priority: "low", dueAt: 1000 + 72 * HOUR },
+      after: { downtimeType: "critical", priority: "high", dueAt: 1000 + 4 * HOUR },
+      metadata: expect.objectContaining({ operation: "downtime" })
+    }));
+  });
+
+  it("rejects system-only transport downtime values", async () => {
+    const handler = createTicketsApiHandler({
+      driver: {
+        get: vi.fn().mockResolvedValue(ticketRecord({ id: "T-downtime-invalid", track: "transport", forkliftId: "forklift-210", downtimeType: "minor", priority: "low" })),
+        upsert: vi.fn()
+      },
+      configDriver: { get: vi.fn().mockResolvedValue({ config: {} }) },
+      sessionClient: sessionClientFor({ role: "admin", permissions: { tickets: "manage" } })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: { operation: "downtime", ticket: { id: "T-downtime-invalid", downtimeType: "needs_triage" } }
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: "ticket_downtime_update_invalid" });
+  });
+
+  it("rejects downtime type changes through the generic update operation", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue(ticketRecord({ id: "T-downtime-generic", track: "transport", forkliftId: "forklift-210", downtimeType: "minor", priority: "low", status: "new" })),
+      upsert: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ role: "admin", permissions: { tickets: "manage" } })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: { operation: "update", ticket: { id: "T-downtime-generic", downtimeType: "critical", priority: "low", status: "new" } }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "ticket_downtime_update_requires_downtime_operation" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["technician", pinSessionClientFor({ role: "tech", name: "שרון", supplier: "טויוטה" }), null, "Bearer cmms-token"],
     ["ordinary manager", null, sessionClientFor({ role: "user", permissions: { tickets: "manage" } }), "Bearer user-token"],
