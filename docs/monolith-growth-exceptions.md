@@ -119,7 +119,7 @@ Each exception must include:
 
 - Date: 2026-07-22
 - Owner goal: transport-specific priority editing in ticket processing.
-- New line count: 10119.
+- New line count: 10118.
 - Why necessary: ticket detail still receives save callbacks and local/normalized ticket providers from `src/ClaudeMaintenanceApp.jsx`; this hotfix adds a minimal `updateTicketDowntime` wiring path so transport tickets can edit `מצב הכלי` through the dedicated transport severity model instead of the generic facility priority editor.
 - Why extraction was not the right move: the validation, derived priority, SLA recalculation, and history logic live in `src/ticketDowntimeUpdateModel.js` and the server guard lives in `server/tickets/handler.js`; extracting the whole ticket detail/save surface would be broader than this owner-reported transport processing bug.
 - Follow-up/removal condition: when ticket detail and ticket save orchestration move into a dedicated ticket module, move this callback wiring with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.

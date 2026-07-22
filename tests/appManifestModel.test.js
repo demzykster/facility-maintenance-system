@@ -15,7 +15,8 @@ describe("app manifest model", () => {
       lang: "he",
       description: "תפעול אחזקה וניהול"
     });
-    expect(manifest.icons).toHaveLength(5);
+    expect(manifest.icons).toHaveLength(4);
+    expect(manifest.icons.every((icon) => icon.src.startsWith("/api/brand-icon?brand="))).toBe(true);
   });
 
   it("uses the centralized fallback for empty company names", () => {

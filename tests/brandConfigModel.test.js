@@ -30,10 +30,16 @@ describe("brand config model", () => {
   it("updates browser and Apple metadata from one company name", () => {
     const meta = { setAttribute: vi.fn() };
     const manifest = { setAttribute: vi.fn() };
+    const favicon = { setAttribute: vi.fn() };
+    const appleIcon = { setAttribute: vi.fn() };
     const documentRef = {
       title: "",
       querySelector: vi.fn((selector) => (
-        selector === 'meta[name="apple-mobile-web-app-title"]' ? meta : manifest
+        selector === 'meta[name="apple-mobile-web-app-title"]' ? meta
+          : selector === 'link[rel="manifest"]' ? manifest
+          : selector === 'link[rel="icon"]' ? favicon
+          : selector === 'link[rel="apple-touch-icon"]' ? appleIcon
+          : null
       ))
     };
 
@@ -41,6 +47,8 @@ describe("brand config model", () => {
     expect(documentRef.title).toBe("Ogen | עוגן");
     expect(meta.setAttribute).toHaveBeenCalledWith("content", "Ogen | עוגן");
     expect(manifest.setAttribute).toHaveBeenCalledWith("href", expect.stringMatching(/^\/manifest\.webmanifest\?brand=/));
+    expect(favicon.setAttribute).toHaveBeenCalledWith("href", expect.stringMatching(/^\/api\/brand-icon\?brand=/));
+    expect(appleIcon.setAttribute).toHaveBeenCalledWith("href", expect.stringMatching(/^\/api\/brand-icon\?brand=/));
 
     applyBrandDocumentMetadata({ companyName: "Next Brand" }, documentRef);
     expect(documentRef.title).toBe("Next Brand");

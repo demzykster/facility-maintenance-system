@@ -7,7 +7,10 @@ const warehouseAsset = new URL("../public/visuals/warehouse-entry.jpg", import.m
 describe("safe visual presentation wiring", () => {
   it("keeps the public entry screen branded from config and separates cleaning scanner from login", () => {
     expect(appSource).toContain("const brandName = brandCompanyName(config)");
-    expect(appSource).toContain("const brandSubtitle = brandSiteSubtitle(config)");
+    expect(appSource).toContain("brandSubtitle = brandSiteSubtitle(config)");
+    expect(appSource).toContain("publicBrandChecked={publicBrandChecked}");
+    expect(appSource).toContain("showHeroBrandCopy = publicBrandChecked");
+    expect(appSource).toContain("{showHeroBrandCopy && <div className=\"login-visual-copy\">");
     expect(appSource).toContain("<span>{brandName}</span>");
     expect(appSource).toContain("{brandSubtitle && <b>{brandSubtitle}</b>}");
     expect(appSource).toContain("login-card-title");

@@ -1743,7 +1743,7 @@ export default function App() {
   };
   const [rolePreviewRole, setRolePreviewRole] = useState(null);
   const [config, setConfig] = useState(DEFAULT_CONFIG);
-  useSiteBranding(config, setConfig);
+  const publicBrandChecked = useSiteBranding(config, setConfig);
   TASK_STATUS_META = config.taskStatusMeta || {};
   const [users, setUsers] = useState([]);
   const [tickets, setTickets] = useState([]);
@@ -3819,7 +3819,7 @@ export default function App() {
     <div dir={languageDirection(language)} lang={language} className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />
       {!ready ? <div className="boot"><div className="spinner" /></div>
-        : !session ? <Login users={users} config={config} onLogin={login} saveUser={saveUser} theme={theme} toggleTheme={toggleTheme} language={language} setLanguage={setLanguage} zones={zones} onAnonReport={submitAnonymousComplaint} builtinLogins={builtinLoginsForMode(APP_MODE, BUILTIN_LOGINS)} seedPolicy={SEED_POLICY} productionLoginConfig={PRODUCTION_LOGIN_CONFIG} />
+        : !session ? <Login users={users} config={config} publicBrandChecked={publicBrandChecked} onLogin={login} saveUser={saveUser} theme={theme} toggleTheme={toggleTheme} language={language} setLanguage={setLanguage} zones={zones} onAnonReport={submitAnonymousComplaint} builtinLogins={builtinLoginsForMode(APP_MODE, BUILTIN_LOGINS)} seedPolicy={SEED_POLICY} productionLoginConfig={PRODUCTION_LOGIN_CONFIG} />
           : (<>
             {effSession.role === "admin" || effSession.role === "executive" ? <AdminApp {...shared} />
               : effSession.role === "tech" ? <TechApp {...shared} key="imp-tech" />
@@ -4125,7 +4125,7 @@ function InstallAppPrompt({ language = DEFAULT_LANGUAGE, companyName = DEFAULT_C
   </div>;
 }
 
-function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language = DEFAULT_LANGUAGE, setLanguage = () => {}, zones, onAnonReport, builtinLogins = [], seedPolicy = SEED_POLICY, productionLoginConfig = PRODUCTION_LOGIN_CONFIG }) {
+function Login({ users, config, publicBrandChecked = false, onLogin, saveUser, theme, toggleTheme, language = DEFAULT_LANGUAGE, setLanguage = () => {}, zones, onAnonReport, builtinLogins = [], seedPolicy = SEED_POLICY, productionLoginConfig = PRODUCTION_LOGIN_CONFIG }) {
   const t = (key, vars) => uiText(language, key, vars);
   const [identifier, setIdentifier] = useState(""), [identifierActive, setIdentifierActive] = useState(false), [secretActive, setSecretActive] = useState(false), [resolved, setResolved] = useState(null), [password, setPassword] = useState(""), [code, setCode] = useState(""), [err, setErr] = useState(""), remember = true, [pub, setPub] = useState(false), [busy, setBusy] = useState(false);
   const [skipScanLanding, setSkipScanLanding] = useState(false);
@@ -4382,16 +4382,15 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
       ? (initialSetup.user?.phone || initialSetup.identifier || identifier.trim())
       : (initialSetup.user?.workerNo || initialSetup.user?.email || initialSetup.identifier || identifier.trim())
   );
-  const brandName = brandCompanyName(config);
-  const brandSubtitle = brandSiteSubtitle(config);
+  const brandName = brandCompanyName(config), brandSubtitle = brandSiteSubtitle(config), showHeroBrandCopy = publicBrandChecked || brandName !== DEFAULT_COMPANY_NAME || brandSubtitle !== DEFAULT_SITE_SUBTITLE || !!config?.brandLogo;
   return (
     <div className="login-bg" dir={languageDirection(language)}>
       <div className="login-shell">
         <div className="login-visual" aria-hidden="true">
-          <div className="login-visual-copy">
+          {showHeroBrandCopy && <div className="login-visual-copy">
             <span>{brandName}</span>
             {brandSubtitle && <b>{brandSubtitle}</b>}
-          </div>
+          </div>}
         </div>
         <main className="login-public-panel" aria-label={t("login.title")}>
           <div className="login-toolbar">

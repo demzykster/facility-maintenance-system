@@ -15,6 +15,8 @@ describe("site branding wiring", () => {
 
   it("keeps static HTML neutral until runtime config is loaded", () => {
     expect(indexSource).toContain('<link rel="manifest" href="/manifest.webmanifest"');
+    expect(indexSource).toContain('<link rel="icon" href="/api/brand-icon"');
+    expect(indexSource).toContain('<link rel="apple-touch-icon" href="/api/brand-icon"');
     expect(indexSource).not.toContain("CMMS CDSL");
   });
 

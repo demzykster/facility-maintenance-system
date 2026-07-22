@@ -1,12 +1,15 @@
 import { brandCompanyName, brandShortName, brandSiteSubtitle } from "./brandConfigModel.js";
+import { brandIconHref } from "./brandIconModel.js";
 
-const APP_ICONS = Object.freeze([
-  Object.freeze({ src: "/icons/icon-192-brand-20260711.png", sizes: "192x192", type: "image/png", purpose: "any" }),
-  Object.freeze({ src: "/icons/icon-192-brand-20260711.png", sizes: "192x192", type: "image/png", purpose: "maskable" }),
-  Object.freeze({ src: "/icons/icon-512-brand-20260711.png", sizes: "512x512", type: "image/png", purpose: "any" }),
-  Object.freeze({ src: "/icons/icon-512-brand-20260711.png", sizes: "512x512", type: "image/png", purpose: "maskable" }),
-  Object.freeze({ src: "/pwa-icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" })
-]);
+function appIcons(config = {}) {
+  const icon = brandIconHref(config);
+  return [
+    { src: icon, sizes: "192x192", type: "image/png", purpose: "any" },
+    { src: icon, sizes: "192x192", type: "image/png", purpose: "maskable" },
+    { src: icon, sizes: "512x512", type: "image/png", purpose: "any" },
+    { src: icon, sizes: "512x512", type: "image/png", purpose: "maskable" }
+  ];
+}
 
 export function buildAppManifest(config = {}) {
   return {
@@ -20,6 +23,6 @@ export function buildAppManifest(config = {}) {
     lang: "he",
     background_color: "#FFFFFF",
     theme_color: "#1F4E8C",
-    icons: APP_ICONS.map((icon) => ({ ...icon }))
+    icons: appIcons(config)
   };
 }

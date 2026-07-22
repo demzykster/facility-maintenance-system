@@ -1,3 +1,5 @@
+import { brandIconHref } from "./brandIconModel.js";
+
 export const DEFAULT_COMPANY_NAME = "עוגן | OGEN";
 export const DEFAULT_SITE_SUBTITLE = "ניהול אחזקה, צי, ניקיון וביגוד";
 export const MAX_BRAND_SHORT_NAME_LENGTH = 24;
@@ -37,5 +39,22 @@ export const applyBrandDocumentMetadata = (config = {}, documentRef = globalThis
 
   const manifest = documentRef.querySelector?.('link[rel="manifest"]');
   manifest?.setAttribute?.("href", `/manifest.webmanifest?brand=${brandVersionToken(companyName)}`);
+
+  const iconHref = brandIconHref(config);
+  let favicon = documentRef.querySelector?.('link[rel="icon"]');
+  if (!favicon && documentRef.createElement && documentRef.head?.appendChild) {
+    favicon = documentRef.createElement("link");
+    favicon.setAttribute("rel", "icon");
+    documentRef.head.appendChild(favicon);
+  }
+  favicon?.setAttribute?.("href", iconHref);
+
+  let appleIcon = documentRef.querySelector?.('link[rel="apple-touch-icon"]');
+  if (!appleIcon && documentRef.createElement && documentRef.head?.appendChild) {
+    appleIcon = documentRef.createElement("link");
+    appleIcon.setAttribute("rel", "apple-touch-icon");
+    documentRef.head.appendChild(appleIcon);
+  }
+  appleIcon?.setAttribute?.("href", iconHref);
   return companyName;
 };

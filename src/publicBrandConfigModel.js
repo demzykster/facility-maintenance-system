@@ -1,18 +1,22 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { applyBrandDocumentMetadata, DEFAULT_COMPANY_NAME, DEFAULT_SITE_SUBTITLE } from "./brandConfigModel.js";
+import { publicBrandIconSrcFromManifest } from "./brandIconModel.js";
 
 const cleanString = (value) => String(value == null ? "" : value).trim();
 
 export function mergePublicBrandConfig(current = {}, manifest = {}) {
   const publicName = cleanString(manifest.name);
   const publicSubtitle = cleanString(manifest.description);
-  if (!publicName && !publicSubtitle) return current;
+  const publicIcon = publicBrandIconSrcFromManifest(manifest);
+  if (!publicName && !publicSubtitle && !publicIcon) return current;
   const currentName = cleanString(current.companyName);
   const currentSubtitle = cleanString(current.siteName);
+  const currentIcon = cleanString(current.brandLogo);
   const next = { ...current };
   if (publicName && (!currentName || currentName === DEFAULT_COMPANY_NAME)) next.companyName = publicName;
   if (publicSubtitle && (!currentSubtitle || currentSubtitle === DEFAULT_SITE_SUBTITLE)) next.siteName = publicSubtitle;
-  if (next.companyName === current.companyName && next.siteName === current.siteName) return current;
+  if (publicIcon && !currentIcon) next.brandLogo = publicIcon;
+  if (next.companyName === current.companyName && next.siteName === current.siteName && next.brandLogo === current.brandLogo) return current;
   return next;
 }
 
@@ -27,12 +31,16 @@ export async function fetchPublicBrandManifest({
 }
 
 export function useSiteBranding(config, setConfig) {
-  useEffect(() => { applyBrandDocumentMetadata(config); }, [config.companyName]);
+  const [publicBrandChecked, setPublicBrandChecked] = useState(false);
+  useEffect(() => { applyBrandDocumentMetadata(config); }, [config.companyName, config.siteName, config.brandLogo]);
   useEffect(() => {
     let active = true;
+    setPublicBrandChecked(false);
     fetchPublicBrandManifest()
       .then((manifest) => { if (active) setConfig((current) => mergePublicBrandConfig(current, manifest)); })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { if (active) setPublicBrandChecked(true); });
     return () => { active = false; };
   }, [setConfig]);
+  return publicBrandChecked;
 }

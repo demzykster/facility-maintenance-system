@@ -2,6 +2,7 @@ export const VERCEL_API_ROUTE_FUNCTION_BUDGET = 24;
 
 export const VERCEL_API_ROUTE_FILES = Object.freeze([
   "api/ai/[action].js",
+  "api/brand-icon.js",
   "api/bootstrap/admin.js",
   "api/[diagnostic].js",
   "api/cleaning/records.js",
