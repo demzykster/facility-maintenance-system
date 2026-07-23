@@ -23,7 +23,8 @@ export function productionLoginConfigFromEnv(env = {}) {
     sessionApiUrl: String(env.VITE_CMMS_SESSION_API_URL || "/api/session/me").trim() || "/api/session/me",
     profileApiUrl: String(env.VITE_CMMS_PROFILE_API_URL || "/api/session/profile").trim() || "/api/session/profile",
     changePasswordApiUrl: String(env.VITE_CMMS_CHANGE_PASSWORD_API_URL || "/api/session/change-password").trim() || "/api/session/change-password",
-    initialPasswordApiUrl: String(env.VITE_CMMS_INITIAL_PASSWORD_API_URL || "/api/session/initial-password").trim() || "/api/session/initial-password"
+    initialPasswordApiUrl: String(env.VITE_CMMS_INITIAL_PASSWORD_API_URL || "/api/session/initial-password").trim() || "/api/session/initial-password",
+    installApiUrl: String(env.VITE_CMMS_INSTALL_API_URL || "/api/install").trim() || "/api/install"
   };
 }
 
@@ -416,4 +417,38 @@ export async function restoreProductionSession({ config, authStore = createProdu
       return null;
     }
   }
+}
+
+export async function fetchFirstRunInstallState({ config = {}, fetchImpl = globalThis.fetch } = {}) {
+  const url = config.installApiUrl || "/api/install";
+  const response = await fetchImpl(url, {
+    method: "GET",
+    credentials: "include",
+    headers: { accept: "application/json" },
+    cache: "no-store"
+  });
+  const data = await readJson(response);
+  if (!response.ok || !data?.ok) throw new Error(data?.error || "install_state_failed");
+  return {
+    ok: true,
+    state: data.state || "unknown",
+    reason: data.reason || ""
+  };
+}
+
+export async function createFirstRunAdmin({ name, email, password, confirmPassword, config = {}, fetchImpl = globalThis.fetch } = {}) {
+  const url = config.installApiUrl || "/api/install";
+  const response = await fetchImpl(url, {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify({ name, email, password, confirmPassword })
+  });
+  const data = await readJson(response);
+  if (!response.ok || !data?.ok) {
+    const error = new Error(data?.error || "install_create_failed");
+    error.data = data;
+    throw error;
+  }
+  return data;
 }

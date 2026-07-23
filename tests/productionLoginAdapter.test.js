@@ -2,9 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import {
   changeProductionPassword,
   cmmsSessionFromProductionUser,
+  createFirstRunAdmin,
   createProductionAuthStore,
   createProductionLoginClient,
   completeProductionInitialPassword,
+  fetchFirstRunInstallState,
   loginWithProductionPassword,
   loginWithProductionPin,
   restoreProductionSession,
@@ -36,7 +38,8 @@ describe("productionLoginAdapter", () => {
       sessionApiUrl: "/api/session/me",
       profileApiUrl: "/api/session/profile",
       changePasswordApiUrl: "/api/session/change-password",
-      initialPasswordApiUrl: "/api/session/initial-password"
+      initialPasswordApiUrl: "/api/session/initial-password",
+      installApiUrl: "/api/install"
     });
     expect(productionLoginReady(productionLoginConfigFromEnv({}))).toBe(false);
     expect(productionLoginReady(productionLoginConfigFromEnv({ VITE_SUPABASE_URL: "https://supabase.example", VITE_SUPABASE_ANON_KEY: "anon" }))).toBe(true);
@@ -66,6 +69,56 @@ describe("productionLoginAdapter", () => {
       perms: { users: "manage" },
       mustChangePassword: true,
       productionSession: true
+    });
+  });
+
+  it("reads first-run install state from the CMMS install endpoint", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify({ ok: true, state: "new" });
+      }
+    });
+
+    await expect(fetchFirstRunInstallState({
+      config: { installApiUrl: "/api/install" },
+      fetchImpl
+    })).resolves.toEqual({ ok: true, state: "new", reason: "" });
+
+    expect(fetchImpl).toHaveBeenCalledWith("/api/install", expect.objectContaining({
+      method: "GET",
+      credentials: "include",
+      cache: "no-store"
+    }));
+  });
+
+  it("creates first-run admin only through the CMMS install endpoint", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify({ ok: true, state: "ready", admin: { id: "app-user-1", email: "owner@example.com", role: "admin", active: true } });
+      }
+    });
+
+    await expect(createFirstRunAdmin({
+      name: "Owner",
+      email: "owner@example.com",
+      password: "long-password",
+      confirmPassword: "long-password",
+      config: { installApiUrl: "/api/install" },
+      fetchImpl
+    })).resolves.toMatchObject({ ok: true, state: "ready" });
+
+    expect(fetchImpl).toHaveBeenCalledWith("/api/install", expect.objectContaining({
+      method: "POST",
+      credentials: "include",
+      headers: expect.objectContaining({ "content-type": "application/json" })
+    }));
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toEqual({
+      name: "Owner",
+      email: "owner@example.com",
+      password: "long-password",
+      confirmPassword: "long-password"
     });
   });
 

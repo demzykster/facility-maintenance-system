@@ -130,3 +130,10 @@ Each exception must include:
 - Why necessary: the public login screen and shell-hosted stylesheet still live in `src/ClaudeMaintenanceApp.jsx`; this focused presentation change hides the public QR report action on desktop, keeps it available on mobile, and moves the dynamic footer/description into the freed panel area without changing authentication, scanner behavior, branding data, or API contracts.
 - Why extraction was not the right move: extracting the full public entry screen would be broader than this owner-requested layout correction; the change only adjusts existing login markup/CSS around already wired auth, branding, install prompt, and public scanner controls.
 - Follow-up/removal condition: when the public entry screen moves into a dedicated module/stylesheet, move this footer and QR presentation with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
+
+- Date: 2026-07-23
+- Owner goal: Ogen R11.8 first-run installation flow.
+- New line count: 10238.
+- Why necessary: the production public entry shell still owns unauthenticated route presentation, dynamic branding, language/theme controls, and the existing login redirect surface; the new `/install` screen needs minimal shell wiring so an empty environment can create the first ordinary admin and then return to the normal login screen without changing the authentication flow.
+- Why extraction was not the right move: the first-run authority and validation live in `server/install/handler.js` and `src/productionLoginAdapter.js`; extracting the whole public login/install surface would be broader than this bounded first-admin creation goal.
+- Follow-up/removal condition: when the public entry and authentication screens move into a dedicated module/stylesheet, move `FirstRunInstall` and its small presentation rules with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.

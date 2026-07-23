@@ -38,7 +38,7 @@ import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ticketAiPr
 import { AI_MODES, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
-import { changeProductionPassword, completeProductionInitialPassword, createProductionAuthStore, loginWithProductionPassword, loginWithProductionPin, logoutProductionSession, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionNotificationReadState, updateProductionProfile, validateProductionInitialPassword } from "./productionLoginAdapter.js";
+import { changeProductionPassword, completeProductionInitialPassword, createFirstRunAdmin, createProductionAuthStore, fetchFirstRunInstallState, loginWithProductionPassword, loginWithProductionPin, logoutProductionSession, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionNotificationReadState, updateProductionProfile, validateProductionInitialPassword } from "./productionLoginAdapter.js";
 import { isOperationallyOverdue } from "./slaModel.js";
 import { DEFAULT_TICKET_SLA_HOURS, resolveTicketSlaHours } from "./ticketSlaPolicyModel.js";
 import { applyTicketPriorityUpdate } from "./ticketPriorityUpdateModel.js";
@@ -1769,6 +1769,8 @@ export default function App() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [theme, setTheme] = useState("light");
   const [language, setLanguageState] = useState(() => preferredInitialLanguage({ cookie: typeof document !== "undefined" ? document.cookie : "", navigator: typeof navigator !== "undefined" ? navigator : undefined }));
+  const [firstRunInstallState, setFirstRunInstallState] = useState(null);
+  const installRouteActive = typeof window !== "undefined" && window.location.pathname === "/install";
   const snapRef = useRef({});
   useEffect(() => { presenceRef.current = presence; }, [presence]);
   const persistLanguagePreference = (nextLanguage) => {
@@ -1824,6 +1826,17 @@ export default function App() {
       fetchPublicZones({ url: PUBLIC_ZONES_URL })
         .then((publicZones) => { if (publicZones.length > 0) setZones(publicZones); })
         .catch(() => {});
+      try {
+        const installState = await fetchFirstRunInstallState({ config: PRODUCTION_LOGIN_CONFIG });
+        if (!cancelled) {
+          setFirstRunInstallState(installState);
+          if (installState?.state === "new" && typeof window !== "undefined" && window.location.pathname !== "/install") {
+            window.history.replaceState(null, "", "/install");
+          }
+        }
+      } catch {
+        if (!cancelled) setFirstRunInstallState({ ok: false, state: "unknown", reason: "install_state_failed" });
+      }
       const restored = await restoreProductionSession({ config: PRODUCTION_LOGIN_CONFIG, authStore: PRODUCTION_AUTH_STORE });
       if (restored?.session) {
 	        setSession(restored.session);
@@ -3819,6 +3832,7 @@ export default function App() {
     <div dir={languageDirection(language)} lang={language} className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />
       {!ready ? <div className="boot"><div className="spinner" /></div>
+        : !session && installRouteActive ? <FirstRunInstall config={config} publicBrandChecked={publicBrandChecked} installState={firstRunInstallState} onInstalled={(state) => { setFirstRunInstallState(state); if (typeof window !== "undefined") window.history.replaceState(null, "", "/"); }} theme={theme} toggleTheme={toggleTheme} language={language} setLanguage={setLanguage} productionLoginConfig={PRODUCTION_LOGIN_CONFIG} />
         : !session ? <Login users={users} config={config} publicBrandChecked={publicBrandChecked} onLogin={login} saveUser={saveUser} theme={theme} toggleTheme={toggleTheme} language={language} setLanguage={setLanguage} zones={zones} onAnonReport={submitAnonymousComplaint} builtinLogins={builtinLoginsForMode(APP_MODE, BUILTIN_LOGINS)} seedPolicy={SEED_POLICY} productionLoginConfig={PRODUCTION_LOGIN_CONFIG} />
           : (<>
             {effSession.role === "admin" || effSession.role === "executive" ? <AdminApp {...shared} />
@@ -4123,6 +4137,100 @@ function InstallAppPrompt({ language = DEFAULT_LANGUAGE, companyName = DEFAULT_C
     {mode === "browser" && <button className="install-btn" type="button" onClick={install} aria-label={t("install.button")} title={t("install.button")}><Download size={16} /></button>}
     <button className="install-x" type="button" onClick={() => setDismissed(true)} aria-label={t("common.close")}><X size={15} /></button>
   </div>;
+}
+
+function FirstRunInstall({ config, publicBrandChecked = false, installState = null, onInstalled = () => {}, theme, toggleTheme, language = DEFAULT_LANGUAGE, setLanguage = () => {}, productionLoginConfig = PRODUCTION_LOGIN_CONFIG }) {
+  const t = (key, vars) => uiText(language, key, vars);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [done, setDone] = useState(false);
+  const brandName = brandCompanyName(config), brandSubtitle = brandSiteSubtitle(config), showHeroBrandCopy = publicBrandChecked || brandName !== DEFAULT_COMPANY_NAME || brandSubtitle !== DEFAULT_SITE_SUBTITLE || !!config?.brandLogo;
+  const state = installState?.state || "unknown";
+  const locked = state === "ready" || state === "blocked" || installState?.ok === false;
+  const goToLogin = () => {
+    if (typeof window !== "undefined") window.history.replaceState(null, "", "/");
+    onInstalled({ ok: true, state: "ready" });
+  };
+  useEffect(() => {
+    if (state !== "ready" || done) return;
+    const id = setTimeout(goToLogin, 0);
+    return () => clearTimeout(id);
+  }, [state, done]);
+  const submit = async () => {
+    if (locked) return;
+    setBusy(true);
+    setErr("");
+    try {
+      await createFirstRunAdmin({ name, email, password, confirmPassword, config: productionLoginConfig });
+      setPassword("");
+      setConfirmPassword("");
+      setDone(true);
+      onInstalled({ ok: true, state: "ready" });
+    } catch (error) {
+      const code = error?.message || "";
+      setErr(
+        code === "valid_email_required" ? "נדרש דוא״ל תקין" :
+        code === "password_min_8_chars" ? "בחרו סיסמה בת 8 תווים לפחות" :
+        code === "password_confirmation_mismatch" ? "הסיסמאות אינן זהות" :
+        code === "system_already_initialized" ? "המערכת כבר הותקנה. עברו למסך הכניסה." :
+        code === "system_install_in_progress" ? "התקנה כבר התחילה. אם זה לא הסתיים, נדרש טיפול ידני לפני ניסיון נוסף." :
+        code === "install_backend_not_configured" ? "התקנת מערכת לא מוגדרת בשרת." :
+        "יצירת מנהל המערכת נכשלה. בדקו חיבור ונסו שוב."
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="login-bg install-bg" dir={languageDirection(language)}>
+      <div className="login-shell">
+        <div className="login-visual" aria-hidden="true">
+          {showHeroBrandCopy && <div className="login-visual-copy">
+            <span>{brandName}</span>
+            {brandSubtitle && <b>{brandSubtitle}</b>}
+          </div>}
+        </div>
+        <main className="login-public-panel install-public-panel" aria-label="התקנת מערכת">
+          <div className="login-toolbar">
+            <LanguagePicker value={language} onChange={setLanguage} compact />
+            <button type="button" className="login-theme" onClick={toggleTheme} aria-label={theme === "dark" ? "מצב בהיר" : "מצב כהה"}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
+          </div>
+          <div className="login-card install-card">
+            <div className="login-card-head">
+              <div className="brand login-title-brand"><BrandMark logo={config?.brandLogo} /><div className="login-card-title">התקנה ראשונית</div></div>
+            </div>
+            {installState?.ok === false ? <>
+              <div className="install-state danger"><AlertTriangle size={18} />לא ניתן לבדוק את מצב ההתקנה כרגע. נסו שוב לאחר בדיקת השרת.</div>
+              <button type="button" className="btn-ghost full" onClick={goToLogin}>{t("login.back")}</button>
+            </> : state === "ready" ? <>
+              <div className="install-state success"><ShieldCheck size={18} />המערכת כבר מוכנה לשימוש.</div>
+              <button type="button" className="btn-primary full" onClick={goToLogin}>{t("login.signIn")}</button>
+            </> : state === "blocked" ? <>
+              <div className="install-state danger"><AlertTriangle size={18} />התקנה קודמת לא הסתיימה. נדרש טיפול ידני לפני יצירת מנהל נוסף.</div>
+              <button type="button" className="btn-ghost full" onClick={goToLogin}>{t("login.back")}</button>
+            </> : done ? <>
+              <div className="install-state success"><ShieldCheck size={18} />מנהל המערכת נוצר. ניתן להתחבר כעת.</div>
+              <button type="button" className="btn-primary full" onClick={goToLogin}>{t("login.signIn")}</button>
+            </> : <>
+              <div className="hint install-copy">צרו מנהל מערכת ראשון רק בסביבה ריקה. לאחר יצירת מנהל פעיל, מסך זה נסגר אוטומטית.</div>
+              <label className="field"><span>שם מנהל</span><input value={name} onChange={(e) => { setName(e.target.value); setErr(""); }} autoComplete="name" placeholder="מנהל מערכת" /></label>
+              <label className="field"><span>דוא״ל</span><input className="ltr-input" dir="ltr" value={email} onChange={(e) => { setEmail(e.target.value); setErr(""); }} autoCapitalize="off" autoComplete="username" inputMode="email" placeholder="name@example.com" /></label>
+              <label className="field"><span>סיסמה</span><input className="ltr-input" dir="ltr" value={password} onChange={(e) => { setPassword(e.target.value); setErr(""); }} type="password" autoComplete="new-password" placeholder="לפחות 8 תווים" /></label>
+              <label className="field"><span>אישור סיסמה</span><input className="ltr-input" dir="ltr" value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setErr(""); }} type="password" autoComplete="new-password" placeholder="הקלידו שוב" onKeyDown={(e) => e.key === "Enter" && submit()} /></label>
+              {err && <div className="err" role="alert" aria-live="polite">{err}</div>}
+              <button type="button" className="btn-primary full" onClick={submit} disabled={busy}>{busy ? "יוצר…" : "יצירת מנהל ראשון"}</button>
+            </>}
+          </div>
+          <div className="login-foot"><span>© <bdi dir="ltr">2026</bdi> {brandName}</span><span><span>{t("login.version")} </span><bdi dir="ltr">v{APP_VERSION}</bdi></span></div>
+        </main>
+      </div>
+    </div>
+  );
 }
 
 function Login({ users, config, publicBrandChecked = false, onLogin, saveUser, theme, toggleTheme, language = DEFAULT_LANGUAGE, setLanguage = () => {}, zones, onAnonReport, builtinLogins = [], seedPolicy = SEED_POLICY, productionLoginConfig = PRODUCTION_LOGIN_CONFIG }) {
@@ -8320,6 +8428,14 @@ a{color:inherit;}
 .login-foot{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;color:var(--muted);font-size:11.5px;margin:0;line-height:1.45;}
 .login-foot>span{display:block;}
 .login-credit{opacity:.58;}
+.install-public-panel{justify-content:center;}
+.install-card{display:flex;flex-direction:column;gap:12px;}
+.install-copy{margin:-2px 0 4px;line-height:1.55;}
+.install-state{display:flex;align-items:center;gap:8px;border-radius:12px;padding:11px 12px;font-size:13.5px;font-weight:750;line-height:1.45;margin-bottom:4px;}
+.install-state.success{background:rgba(22,163,74,.10);color:#166534;border:1px solid rgba(22,163,74,.22);}
+.install-state.danger{background:rgba(185,28,28,.10);color:#991B1B;border:1px solid rgba(185,28,28,.22);}
+.app-dark .install-state.success{color:#86EFAC;background:rgba(22,163,74,.16);border-color:rgba(134,239,172,.22);}
+.app-dark .install-state.danger{color:#FCA5A5;background:rgba(185,28,28,.18);border-color:rgba(252,165,165,.25);}
 .app-dark .login-shell{background:rgba(27,32,39,.78);border-color:rgba(52,59,69,.88);box-shadow:0 24px 70px rgba(0,0,0,.38);}
 .app-dark .login-visual{background-image:linear-gradient(90deg,rgba(4,8,13,.82),rgba(4,8,13,.32)),url("/visuals/warehouse-entry.jpg");}
 .install-prompt{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:9px;margin-top:12px;padding:10px 11px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);color:var(--ink);text-align:start;}
