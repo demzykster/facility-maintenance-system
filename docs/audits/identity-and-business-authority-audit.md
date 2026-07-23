@@ -158,9 +158,9 @@ Confirmed aligned:
 - Admin shortcut to transport manager-approved state is blocked.
 - Facility manager execution is outside the transport supplier queue guard.
 
-Known mismatch:
+Confirmed priority/SLA behavior:
 
-- The R11.7 canonical urgency text says priority changes should not recalculate SLA. Current implementation and tests for facility priority edits explicitly recalculate `dueAt` and write `dueAtBefore`/`dueAtAfter`. Transport generic priority edit is rejected. This should be treated as an owner decision before any code change.
+- Facility priority edits recalculate `dueAt`, update the SLA target, and write `dueAtBefore`/`dueAtAfter`. Transport generic priority edit is rejected; transport downtime edits use the transport downtime model and also recalculate the derived SLA target.
 
 ## UI vs Server Enforcement Matrix
 
@@ -179,10 +179,9 @@ Known mismatch:
 
 ## Unresolved Owner Decisions
 
-1. Decide whether facility priority edits should keep recalculating SLA or change to priority-only history.
-2. Decide whether legacy non-tech CMMS session tokens must be revalidated against `app_users` in every API path, not only session/profile and technician ticket paths.
-3. Decide how to handle tickets assigned to a user who is disabled.
-4. Define the operator recovery process for the case where no active admin remains.
+1. Decide whether legacy non-tech CMMS session tokens must be revalidated against `app_users` in every API path, not only session/profile and technician ticket paths.
+2. Decide how to handle tickets assigned to a user who is disabled.
+3. Define the operator recovery process for the case where no active admin remains.
 
 ## Safe Remediation Order
 

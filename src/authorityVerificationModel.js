@@ -165,7 +165,7 @@ export function buildAuthorityVerificationReport({
     ownerDecisions: [
       "Keep at least two active admin app_users before disabling the original admin.",
       "Decide whether legacy non-tech CMMS session tokens should be revalidated against app_users in every API path.",
-      "Resolve the current priority edit/SLA behavior mismatch before changing urgency semantics."
+      "Define the operator recovery process for a completed installation with no active admin."
     ]
   });
 }

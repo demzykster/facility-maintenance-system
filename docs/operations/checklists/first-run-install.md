@@ -5,6 +5,7 @@ Use this only for a brand-new or disposable environment. Never install over prod
 ## Before
 
 - Confirm the target URL is the intended empty environment.
+- Confirm the permanent install marker is absent.
 - Confirm `public.app_users` has zero active `admin` rows.
 - Confirm `/api/health` is available.
 - Confirm `/api/install` returns `state = new`.
@@ -25,6 +26,7 @@ Use this only for a brand-new or disposable environment. Never install over prod
 - Sign in with the created admin.
 - Confirm the user appears as an ordinary active `admin`.
 - Confirm an audit event exists for source `first-run-install`.
+- Confirm the permanent install marker exists in `app_config`.
 - Confirm another active admin can later be created through normal user management.
 - Confirm the final active admin cannot be disabled or demoted through normal admin/user APIs.
 
@@ -33,4 +35,5 @@ Use this only for a brand-new or disposable environment. Never install over prod
 - Do not enable the legacy token bootstrap unless separately approved.
 - Do not delete orphan Auth users without evidence and approval.
 - Do not create a hidden owner or special user record.
-- Do not add an `initialized` flag unless the active-admin source of truth proves insufficient.
+- Do not clear the permanent install marker to force `/install` open.
+- Do not treat `ADMIN_RECOVERY_REQUIRED` as a new installation.

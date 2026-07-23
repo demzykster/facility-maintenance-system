@@ -43,7 +43,7 @@ This map identifies where authority currently lives. It is not a workflow redesi
 
 ## Current Mismatches and Decisions
 
-- Priority edit/SLA: the current code recalculates SLA for facility priority edits. Do not describe this as priority-only until an owner-approved code change exists.
+- Priority edit/SLA: the accepted current behavior recalculates SLA for facility priority edits and for transport downtime-derived priority changes. Do not describe these operations as priority-only.
 - User deactivation/reassignment: disabling a user does not automatically transfer active tickets.
 - Legacy CMMS token compatibility: normalized Supabase sessions fail closed through `app_users`; some legacy CMMS-token paths exist for PIN users and compatibility. Keep them tested and avoid treating token payloads as long-term standalone authority.
 

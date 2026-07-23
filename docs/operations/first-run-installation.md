@@ -8,10 +8,13 @@ It is not a production data-change approval. Never use it to reset or replace a 
 
 The system is considered:
 
-- `NEW` when `public.app_users` has zero active rows with `role = admin`.
-- `READY` when `public.app_users` has at least one active row with `role = admin`.
+- `NEW` when the permanent install marker is absent and `public.app_users` has zero active rows with `role = admin`.
+- `READY` when the permanent install marker is completed and `public.app_users` has at least one active row with `role = admin`.
+- `ADMIN_RECOVERY_REQUIRED` when the permanent install marker is completed but there are zero active admin rows.
 
-There is no separate permanent `initialized` flag. The first-run installation lock is stored in `public.app_config` only to prevent concurrent first-admin creation and to preserve failure state. It is not the readiness authority.
+The permanent install marker is stored in `public.app_config` separately from the transient first-run lock. Losing all active admins after installation does not make the system new again.
+
+The transient lock prevents concurrent first-admin creation. A separate recovery-required state records partial failures that cannot be safely retried without operator review.
 
 ## Public Endpoint
 
@@ -35,7 +38,8 @@ The endpoint must not return secrets, Supabase project URLs, service-role keys, 
 6. The server creates a Supabase Auth user.
 7. The server creates the matching `app_users` profile as an ordinary active `admin`.
 8. The server writes an audit event with source `first-run-install`.
-9. The UI returns to the normal login screen.
+9. The server writes the permanent install marker.
+10. The UI returns to the normal login screen.
 
 The browser never supplies role, permissions, active state, owner state, or special admin flags.
 
@@ -43,9 +47,11 @@ The browser never supplies role, permissions, active state, owner state, or spec
 
 The install lock prevents two concurrent first-admin attempts from creating two administrators.
 
-If Auth creation succeeds but the `app_users` profile write fails, the endpoint must not report success. The lock is marked failed and the UI reports that manual recovery is required before retrying.
+If Auth creation succeeds but DB completion fails, the endpoint must not report success. DB completion includes creating the `app_users` profile, writing the required audit event, and writing the permanent install marker.
 
-Manual recovery must confirm whether there is an orphan Supabase Auth user and whether `app_users` still has zero active admins. Do not delete or recreate users without owner approval and evidence capture.
+The server first attempts to delete only the Supabase Auth identity created by that install request and to clear the transient lock. If that cleanup succeeds, the install can be retried safely.
+
+If cleanup fails, the system enters `ADMIN_RECOVERY_REQUIRED`. Manual recovery must confirm whether there is an orphan Supabase Auth user, whether `app_users` still has zero active admins, and whether the permanent marker was written. Do not delete or recreate users without owner approval and evidence capture.
 
 ## Last Active Admin Protection
 
@@ -57,12 +63,12 @@ This guard protects first-run recovery from locking out the system after the fir
 
 The older `/api/bootstrap/admin` route remains a separate env-gated operational path. It requires explicit bootstrap env configuration and is not the normal first-run flow.
 
-Do not enable the token bootstrap in production unless the owner has approved that separate recovery action.
+Do not enable the token bootstrap in production unless the owner has approved that separate recovery action. If the system is already marked installed but has no active admin, bootstrap recovery requires explicit recovery configuration and must be audit-logged.
 
 ## Security Notes
 
 - First admin is an ordinary `admin`, not a hidden superuser.
-- Readiness is data-driven from active admin rows.
+- Readiness is data-driven from the permanent install marker plus active admin rows.
 - Disabled users fail closed in the existing session authority.
 - Unknown or unmapped authenticated users fail closed.
 - Existing sessions do not grant access to `/install`; the endpoint state decides whether first-run is allowed.
@@ -72,7 +78,7 @@ Do not enable the token bootstrap in production unless the owner has approved th
 Stop before attempting first-run installation if:
 
 - production already has an active admin;
-- `/api/install` reports `blocked`;
+- `/api/install` reports `blocked` or `admin_recovery_required`;
 - Supabase Auth user creation partially succeeded but profile creation failed;
 - owner approval is missing for manual recovery;
 - the environment is not confirmed to be a disposable or brand-new target.
