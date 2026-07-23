@@ -146,6 +146,43 @@ describe("admin profile handler", () => {
     expect(profileClient.updateAppUserProfile).not.toHaveBeenCalled();
   });
 
+  it("treats a second active admin as an equivalent system manager", async () => {
+    const secondAdminProfile = {
+      ...adminProfile,
+      id: "admin-2",
+      auth_user_id: "admin-auth-2",
+      name: "Second Admin",
+      email: "second-admin@example.com"
+    };
+    const profileClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "admin-auth-2", email: "second-admin@example.com" }),
+      getAppUserProfile: vi.fn().mockResolvedValue(secondAdminProfile),
+      updateAuthEmail: vi.fn(),
+      updateAppUserProfile: vi.fn().mockResolvedValue({
+        id: "target-2",
+        auth_user_id: "target-auth-2",
+        role: "user",
+        active: true
+      })
+    };
+    const handler = createAdminProfileHandler({ profileClient });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer second-admin-token" },
+      body: {
+        authUserId: "target-auth-2",
+        patch: { role: "user", active: true, departments: ["Ops"] }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(profileClient.updateAppUserProfile).toHaveBeenCalledWith("target-auth-2", {
+      role: "user",
+      active: true,
+      departments: ["Ops"]
+    });
+  });
+
   it("returns 400 when authUserId is missing", async () => {
     const profileClient = {
       getAuthUser: vi.fn(),

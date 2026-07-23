@@ -290,6 +290,36 @@ describe("session handler", () => {
     expect(driver.listValues).not.toHaveBeenCalled();
   });
 
+  it("fails closed for disabled or unknown CMMS PIN app_users profiles", async () => {
+    const disabledClient = {
+      findPinSessionUser: vi.fn().mockResolvedValue({
+        id: "app-worker-disabled",
+        role: "worker",
+        workerNo: "2043",
+        active: false
+      })
+    };
+    const unknownClient = {
+      findPinSessionUser: vi.fn().mockResolvedValue(null)
+    };
+    const disabledToken = signCmmsSessionToken("app-worker-disabled", "worker", "2043", "session-secret", Date.now()).token;
+    const unknownToken = signCmmsSessionToken("app-worker-unknown", "worker", "2044", "session-secret", Date.now()).token;
+
+    const disabledRes = await call(createSessionMeHandler({
+      pinSessionClient: disabledClient,
+      env: { CMMS_SESSION_SECRET: "session-secret" }
+    }), { headers: { authorization: `Bearer ${disabledToken}` } });
+    const unknownRes = await call(createSessionMeHandler({
+      pinSessionClient: unknownClient,
+      env: { CMMS_SESSION_SECRET: "session-secret" }
+    }), { headers: { authorization: `Bearer ${unknownToken}` } });
+
+    expect(disabledRes.statusCode).toBe(403);
+    expect(disabledRes.json()).toEqual({ error: "app_user_disabled" });
+    expect(unknownRes.statusCode).toBe(401);
+    expect(unknownRes.json()).toEqual({ error: "cmms_user_missing" });
+  });
+
   it("calls Supabase Auth and app_users REST with anon key plus user bearer token", async () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce({
