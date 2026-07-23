@@ -55,6 +55,7 @@
     "health:check": "node tools/health-check.mjs",
     "rollback:verify": "node tools/rollback-verify.mjs",
     "domain:verify": "node tools/domain-verify.mjs",
+    "platform:verify": "node tools/platform-verify.mjs",
     "staging:data:summary": "node tools/staging-data-summary.mjs",
     "staging:kv:residuals": "node tools/staging-kv-residuals-report.mjs",
     "staging:kv:retire-mirrors": "node tools/staging-kv-retire-mirrors.mjs",
