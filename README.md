@@ -32,7 +32,7 @@ The deployed staging/pilot app uses the server session path backed by Supabase A
 
 ## Project Continuity
 
-For handoff to another PC or Codex session, start with `AGENTS.md`, verify Git/GitHub state, then read `docs/current-state.md`. Use architecture/ADR and task-specific docs next; use the links below as historical/reference context when needed.
+For handoff to another PC or Codex session, start with `AGENTS.md`, verify Git/GitHub state, then read `docs/current-state.md` and the operational entry point at `docs/operations/README.md`. Use architecture/ADR and task-specific docs next; use the links below as historical/reference context when needed.
 
 - [Active work ledger — historical/reference](docs/active-work.md)
 - [Current status archive](docs/current-status.md)

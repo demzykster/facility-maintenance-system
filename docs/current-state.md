@@ -1,131 +1,87 @@
 # Current State
 
-Last repo-local harness update: 2026-07-18.
+Last verified for R12 documentation work: 2026-07-23.
+
+This file is the compact current-status source for the repository. It does not replace live verification. Before a production claim, release, rollback, restore, domain change, or platform move, re-check Git, production `/cmms-version.json`, production `/api/health`, CI, Vercel, and Supabase as applicable.
 
 ## Baseline
 
 - Repository: `demzykster/facility-maintenance-system`.
-- Primary local path: `/Users/Vadim/Documents/CMMS`.
 - Primary branch: `main`.
-- Current verified local `HEAD = origin/main`: `b0520825cfdbfe8a358e7f773ae54976d84abba5`.
-- Public deployment: `https://facility-maintenance-system.vercel.app`.
-- Current verified live version endpoint: `/cmms-version.json` reports `b052082`.
-- Deployment label: live pilot / production-like controlled rollout, not final production.
+- Current production URL: `https://facility-maintenance-system.vercel.app`.
+- Current production reference at R12 start: `origin/main = production = 567a5f9571537c7afb82c88671aeac12aee8ca3c`.
+- Local R11.6 documentation/tooling work at R12 start: `main` ahead of `origin/main` by two local commits:
+  - `c9ec5be` — `Add platform portability verification`
+  - `24213dc` — `Document hosting migration readiness`
+- Production `/cmms-version.json` at R12 start: `567a5f9`.
+- Production `/api/health` at R12 start: `ok`.
+- Package manager: npm with `package-lock.json`.
+- CI workflow: `.github/workflows/ci.yml`, Node 24.
+- Deployment model: Vercel project `facility-maintenance-system` serving Vite static assets and Vercel Functions under `api/`.
+- Runtime data/services: Supabase-backed Auth, Postgres, Storage, app profiles, audit, and normalized business APIs.
 
-Verify Git, GitHub, Vercel, Supabase, and live health again before using these facts for release or production claims.
+## Canonical Entry Points
 
-## Canonical Docs
+- `AGENTS.md` is the repo-local Codex/project harness entry point.
+- `docs/current-state.md` is this compact current-state summary.
+- `docs/operations/README.md` is the operational entry point for owners/operators.
+- `docs/operations/runbook-index.md` maps canonical operational runbooks.
+- `docs/architecture-rules.md` and `docs/decisions/` contain durable architecture and ADR rules.
+- `docs/platform-portability-runbook.md` and `docs/platform-portability-checklist.md` record R11.6 local platform portability findings. They are local until pushed/deployed by a later approved goal.
 
-- `AGENTS.md` is the Codex entry point.
-- `docs/current-state.md` describes current state and open decisions.
-- `docs/architecture-rules.md` describes durable architecture rules.
-- `docs/decisions/` contains accepted ADRs.
-- `docs/architecture/cmms-agent-core.md` describes the provider-independent target boundary for future CMMS Agent Core work.
-- `docs/templates/vertical-slice-extraction.md` is the required template for extraction goals.
+Historical handoffs, audits, archived reports, and old ledgers remain useful evidence, but they do not override current code, Git, production health/version, or this file.
 
-Historical or detailed handoff documents remain useful, but they do not override the files above or current code.
+## Completed Operational Stages
 
-## Confirmed Current State
+- R8 Recovery readiness: documented in `docs/recovery-readiness-r8.md`.
+- R9 Monitoring: documented in `docs/monitoring-runbook.md`; manual GitHub health workflow exists.
+- R10 Rollback/incident readiness: documented in `docs/rollback-checklist.md` and `docs/incident-response-runbook.md`.
+- R11 Security reconciliation: documented in `docs/security-reconciliation-r11.md`.
+- R11.5 Domain portability: documented in `docs/domain-change-runbook.md` and `docs/domain-change-checklist.md`; deployed baseline is `567a5f9`.
+- R11.6 Platform portability: local docs/tooling complete on top of `567a5f9`; current finding is `SMALL_ADAPTER_REQUIRED` for non-Vercel full runtime because there is no production Node API entrypoint.
 
-- `main` is the active product line for v1 work.
-- The live public app is a live pilot used with real owner data. Treat it as production-like.
-- R10 production data-core work is closed for the currently mapped v1 domains unless a new live bug, explicit domain, or independent finding reopens a slice.
-- Server-side ticket create is deployed and enabled in the live pilot with:
-  - `CMMS_TICKET_SERVER_CREATE_V2` present/on;
-  - `CMMS_TICKET_SERVER_CREATE_V2_READY` present/on.
-- AI autonomous ticket create remains disabled in the live pilot: `CMMS_AI_AUTONOMOUS_TICKET_CREATE` is absent/off.
-- Live ticket-create rollout completed through controlled smoke evidence:
-  - server-authoritative facility numbering worked;
-  - replay did not create a duplicate;
-  - changed create payload returned conflict;
-  - worker scope was enforced;
-  - existing tickets were not changed;
-  - AI autonomy stayed off.
-- The controlled server-create smoke test record is retained as audit/idempotency evidence instead of being physically deleted.
-- Ticket read object scope is enforced server-side for authenticated ticket reads.
-- Ticket write object scope is enforced server-side for update/delete paths that were in the ticket write-scope goal.
-- Server-create system-field hardening is deployed in code and the corrective live migration `20260718172000_ticket_create_system_field_hardening.sql` is applied.
-- Remote live migration history includes:
-  - `20260712102000_executive_bi_read_policies.sql`;
-  - `20260714120000_ticket_create_numbering.sql`;
-  - `20260717003000_ticket_create_actor_id_conflict_fix.sql`;
-  - `20260718172000_ticket_create_system_field_hardening.sql`.
-- Current AI implementation has both:
-  - a human-confirmed proposal path for deterministic actions;
-  - a feature-gated autonomous `create_ticket` capability path that is inert while the autonomy flag is off.
-- Server-backed AI exists through `/api/ai/assist`, grouped under `api/ai/[action].js`.
-- AI provider SDK usage is centralized in `server/ai/providerClient.js`.
-- Current supported provider families are Anthropic, Google/Gemini, and OpenAI-compatible providers through the server boundary.
-- `/api/ai/status` is authenticated and does not expose provider secrets. A live provider connection check requires an authenticated user with settings access.
-- AI context is assembled from the current app snapshot, then filtered server-side by authenticated role and scope through `src/aiAssistContextModel.js`.
-- Current conversation memory remains panel/request-local:
-  - `src/AIPanel.jsx` keeps open-panel messages in React state;
-  - `/api/ai/assist` accepts recent messages in the request and sanitizes/truncates them;
-  - messages are not durably stored as conversations.
-- Scoped AI Memory Pilot v1 is prepared in the current checkout behind `CMMS_AI_MEMORY_PILOT`:
-  - memory facts are a CMMS-owned subsystem under `server/agent/memory/`;
-  - memory facts use explicit personal/department/organization/asset scope and server-side scope checks;
-  - UI save/update/deactivate remains human-confirmed;
-  - the new migration `20260718203000_ai_memory_facts.sql` is pending and has not been applied to live;
-  - no conversation table or embedding/vector retrieval layer exists.
-- AI assist audit diagnostics exist through `audit_events` and protected system diagnostics, but audit is not counted as AI memory unless a future retrieval layer explicitly uses it as memory.
-- The AI capability registry is a useful working allowlist point, not yet a proven universal Agent Core framework.
-- BI includes a unified overview and ticket heatmap through `src/BIOverview.jsx`, `src/BIHeatmapPanel.jsx`, and `src/biScopeModel.js`.
-- `src/ClaudeMaintenanceApp.jsx` is still the app shell and composition root. It should not receive new business logic.
-- External audit and evidence-backlog snapshots are archived under `docs/archive/` as advisory history. They do not override current code, Git state, or this file.
+## Current Operational Facts
 
-## Current AI Request Path
+- The live public app is a production-like live pilot with real owner data. Treat production/Vercel/Supabase/DNS/env/data as live.
+- Production writes, env changes, Vercel changes, Supabase changes, DNS changes, migrations, and destructive cleanup require explicit owner approval for that exact action.
+- `/cmms-version.json` is the public version trace endpoint.
+- `/api/health` is public and read-only; it checks API liveness, compact configuration status, Supabase connectivity, and storage configuration without exposing business data or secrets.
+- `/api/*` routes are implemented as Vercel Function route files that delegate to server handlers.
+- No full non-Vercel production `npm start` API server entrypoint exists as of R12 start.
+- `npm run release:check` and `npm run project:harness:check` are local guardrails, not deployment actions.
+- `npm run domain:verify` is read-only and requires explicit URLs.
+- `npm run platform:verify` is local/read-only and does not deploy, call production, or print secret values.
+- `npm run docs:verify` is the R12 local documentation guardrail once added.
 
-1. User enters text in `src/AIPanel.jsx`.
-2. The panel sends `text`, recent panel messages, workflow, idempotency key, and a compact UI context snapshot through `callAIAssistant()`.
-3. `api/ai/[action].js` dispatches `/api/ai/assist` to `server/ai/assistHandler.js`.
-4. `authorizeAiRequest()` verifies Supabase/Auth or CMMS PIN session.
-5. `buildAiAssistContext()` rebuilds role-filtered context from the submitted snapshot and authenticated user.
-6. `buildAiIntakeDraft()` and `buildAiAssistActionProposals()` produce deterministic draft/action proposals.
-7. If autonomy and server-create are ready, the allowlisted `create_ticket` capability may execute through `createTicketRecord()` and the Supabase RPC-backed ticket driver. In live, the autonomy flag is off, so this branch is inert.
-8. Otherwise, the server provider boundary calls the configured provider and returns advisory assistant text plus deterministic proposals.
-9. AI assist events write safe audit metadata when the audit driver is configured.
+## AI and Business Operation Boundary
 
-## Partial, Stale, Or Unknown
+- AI provider SDK usage stays behind `server/ai/providerClient.js`.
+- AI writes must use normal server/domain operations with authentication, authorization, audit, idempotency, and authoritative read-back.
+- Autonomous transport ticket create has dedicated permission/flag/server-visible-asset gates.
+- Facility autonomous create is not a current capability.
+- Durable AI conversations and scoped AI memory are feature/permission gated and must remain server-authorized.
+- `src/ClaudeMaintenanceApp.jsx` remains the app shell/composition root and should not receive new business logic.
 
-- Live AI provider success is not guaranteed by code or env-name evidence alone. Verify `/api/ai/status?check=1` only when the goal allows an authenticated live read.
-- AI autonomous ticket create has lab/local evidence and code hardening, but it has not been enabled in the live pilot.
-- Scoped AI Memory Pilot v1 still needs controlled lab/live rollout before it can be treated as deployed behavior.
-- The current AI rate limit is in-process. It is not a durable cross-instance quota.
-- The current provider boundary does not define an explicit provider timeout, token-budget governance beyond configured max tokens, or durable loop protection.
-- Provider-specific model options are normalized in `src/aiProviderModel.js`, but future provider-native tool calls must not become business writes.
-- `src/ClaudeMaintenanceApp.jsx` still owns AI panel wiring, context snapshot adaptation, open/close state, action confirmation wiring, and several app-shell decisions.
-- Current load test, backup/restore drill, rollback drill, monitoring/alerts, security advisor output, and app issue report contents require fresh verification before release claims.
-- `docs/current-status.md` is archive/reference.
-- Long sections of `docs/handoff-for-next-codex.md` are historical handoff detail.
-- `docs/codex-main-log.md` is a session log and old guardrail record, not the current entry point.
+## Historical / Reference Docs
 
-## Product Priorities
+These files preserve useful history but must not be treated as current state without re-verification:
 
-1. Keep the current live pilot stable and usable.
-2. Keep server-side authorization, audit, idempotency, and rollback evidence ahead of every write-path expansion.
-3. Improve AI toward a contextual assistant that uses normal product operations.
-4. Roll out durable AI memory only after the scoped pilot migration, flag, and lab/live verification are explicitly approved.
-5. Reduce the monolith incrementally through vertical slices.
-6. Finish heatmap/BI work as a unified decision shell.
-7. Fix real owner-reported or independently verified active problems.
+- `docs/active-work.md`
+- `docs/current-status.md`
+- `docs/handoff-for-next-codex.md`
+- `docs/handoffs/*`
+- `docs/audits/*`
+- `docs/archive/*`
+- older rollout notes that cite old SHAs or old staging assumptions
 
-Do not start any priority without an explicit owner goal.
+## Open Owner Decisions
 
-## Next Allowed Operational Stage
+- Final production label versus production-like live pilot terminology.
+- Explicit RPO/RTO targets and whether PITR/billing should be enabled.
+- Current restore drill for the full live data/storage scope.
+- DNS provider and domain ownership/access register details.
+- Non-Vercel target platform, if any, for a future hosting migration.
+- Whether to implement a small Node API adapter for Docker/Cloud Run/Azure readiness.
+- Secrets recovery/rotation ownership outside repository evidence.
 
-The next AI stage is not a broad AI rollout. The safe sequence is:
-
-1. Keep live AI autonomy off until a new owner-approved rollout goal.
-2. Re-check live provider readiness with authenticated `/api/ai/status?check=1` only when explicitly allowed.
-3. If autonomy is considered, run a controlled lab/live preflight and one synthetic smoke for the exact low-risk `create_ticket` path.
-4. Keep `CMMS_AI_MEMORY_PILOT` off until the scoped memory pilot migration and lab verification are separately approved.
-
-Detailed older ticket-create rollout criteria live in `docs/ai-ticket-create-slice-metrics.md`; use current Git/live evidence before treating older rollout wording as current.
-
-## Open Decisions
-
-- BFF/service-role versus future user-scoped/RLS boundary remains open. Do not create an ADR until the owner accepts a concrete decision.
-- Future AI action autonomy must be approved per domain command and risk class. Universal confirmation is the current implementation for most actions, not the permanent target.
-- Scoped AI Memory Pilot v1 rollout remains open: migration apply, feature flag enablement, and lab/live verification need separate owner approval.
-- Further monolith reduction should proceed by scoped extraction goals, not by a global folder migration.
+Do not start any next operational or product stage without an explicit owner goal.
