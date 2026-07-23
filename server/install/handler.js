@@ -3,6 +3,8 @@ import { sendServerError } from "../httpErrors.js";
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 
 const INSTALL_LOCK_ID = "install:first-admin";
+const INSTALL_MARKER_ID = "install:completed";
+const INSTALL_RECOVERY_ID = "install:recovery-required";
 const INSTALL_LOCK_SOURCE = "first-run-install";
 
 const json = (res, status, body) => {
@@ -101,18 +103,39 @@ const installAuditEvent = (appUser = {}, admin = {}) => normalizeAuditEvent({
   metadata: { source: INSTALL_LOCK_SOURCE }
 });
 
-const installStateFrom = ({ hasActiveAdmin, lock }) => {
-  if (hasActiveAdmin) return { ok: true, state: "ready" };
+const isCompletedMarker = (marker) => {
+  const config = marker?.config || {};
+  return config.status === "completed" || config.firstInstallCompleted === true;
+};
+
+const isRecoveryMarker = (marker) => {
+  const config = marker?.config || {};
+  return config.status === "recovery_required" || config.recoveryRequired === true;
+};
+
+export const installStateFrom = ({ hasActiveAdmin, marker, lock, recovery }) => {
+  const completed = isCompletedMarker(marker);
+  if (completed && hasActiveAdmin) return { ok: true, state: "ready" };
+  if (completed && !hasActiveAdmin) return { ok: true, state: "admin_recovery_required", reason: "active_admin_missing" };
+  if (isRecoveryMarker(recovery)) return { ok: true, state: "admin_recovery_required", reason: "install_recovery_required" };
   const status = String(lock?.config?.status || "").trim();
   if (status === "pending") return { ok: true, state: "blocked", reason: "install_in_progress" };
-  if (status === "failed") return { ok: true, state: "blocked", reason: "install_recovery_required" };
+  if (status === "failed") return { ok: true, state: "admin_recovery_required", reason: "install_recovery_required" };
+  if (hasActiveAdmin) return { ok: true, state: "ready", reason: "legacy_marker_missing" };
   return { ok: true, state: "new" };
 };
 
 async function writeAuditEvent(auditDriver, event) {
-  if (typeof auditDriver?.write !== "function") return;
+  if (typeof auditDriver?.write !== "function") throw new Error("install_audit_not_configured");
   await auditDriver.write(event);
 }
+
+const appConfigRow = (id, config = {}) => ({
+  id,
+  config,
+  source_kv_key: id,
+  legacy_payload: {}
+});
 
 export function createSupabaseInstallClient({ url, serviceRoleKey, fetchImpl = globalThis.fetch, appConfigTable = "app_config" } = {}) {
   if (!url || !serviceRoleKey || !fetchImpl) return null;
@@ -137,6 +160,24 @@ export function createSupabaseInstallClient({ url, serviceRoleKey, fetchImpl = g
       });
       const data = await readJsonOrText(response);
       if (!response.ok) throw new Error(errorMessage(data, `install_lock_get_${response.status}`));
+      return Array.isArray(data) && data[0] ? data[0] : null;
+    },
+    async getPermanentInstallMarker() {
+      const response = await fetchImpl(`${configBase}?id=eq.${encodeURIComponent(INSTALL_MARKER_ID)}&select=id,config,updated_at&limit=1`, {
+        method: "GET",
+        headers: serviceHeaders(serviceRoleKey)
+      });
+      const data = await readJsonOrText(response);
+      if (!response.ok) throw new Error(errorMessage(data, `install_marker_get_${response.status}`));
+      return Array.isArray(data) && data[0] ? data[0] : null;
+    },
+    async getInstallRecoveryState() {
+      const response = await fetchImpl(`${configBase}?id=eq.${encodeURIComponent(INSTALL_RECOVERY_ID)}&select=id,config,updated_at&limit=1`, {
+        method: "GET",
+        headers: serviceHeaders(serviceRoleKey)
+      });
+      const data = await readJsonOrText(response);
+      if (!response.ok) throw new Error(errorMessage(data, `install_recovery_get_${response.status}`));
       return Array.isArray(data) && data[0] ? data[0] : null;
     },
     async acquireInstallLock() {
@@ -166,6 +207,14 @@ export function createSupabaseInstallClient({ url, serviceRoleKey, fetchImpl = g
       }
       return Array.isArray(data) && data[0] ? data[0] : row;
     },
+    async clearInstallLock() {
+      const response = await fetchImpl(`${configBase}?id=eq.${encodeURIComponent(INSTALL_LOCK_ID)}`, {
+        method: "DELETE",
+        headers: serviceHeaders(serviceRoleKey, { prefer: "return=minimal" })
+      });
+      const data = await readJsonOrText(response);
+      if (!response.ok) throw new Error(errorMessage(data, `install_lock_delete_${response.status}`));
+    },
     async markInstallLock(status, metadata = {}) {
       const now = new Date().toISOString();
       const response = await fetchImpl(`${configBase}?id=eq.${encodeURIComponent(INSTALL_LOCK_ID)}`, {
@@ -182,6 +231,39 @@ export function createSupabaseInstallClient({ url, serviceRoleKey, fetchImpl = g
       });
       const data = await readJsonOrText(response);
       if (!response.ok) throw new Error(errorMessage(data, `install_lock_update_${response.status}`));
+    },
+    async setPermanentInstallMarker(metadata = {}) {
+      const now = new Date().toISOString();
+      const response = await fetchImpl(`${configBase}?on_conflict=id`, {
+        method: "POST",
+        headers: serviceHeaders(serviceRoleKey, { prefer: "resolution=merge-duplicates,return=minimal" }),
+        body: JSON.stringify(appConfigRow(INSTALL_MARKER_ID, {
+          source: INSTALL_LOCK_SOURCE,
+          status: "completed",
+          firstInstallCompleted: true,
+          completedAt: now,
+          updatedAt: now,
+          ...metadata
+        }))
+      });
+      const data = await readJsonOrText(response);
+      if (!response.ok) throw new Error(errorMessage(data, `install_marker_set_${response.status}`));
+    },
+    async markInstallRecoveryRequired(metadata = {}) {
+      const now = new Date().toISOString();
+      const response = await fetchImpl(`${configBase}?on_conflict=id`, {
+        method: "POST",
+        headers: serviceHeaders(serviceRoleKey, { prefer: "resolution=merge-duplicates,return=minimal" }),
+        body: JSON.stringify(appConfigRow(INSTALL_RECOVERY_ID, {
+          source: INSTALL_LOCK_SOURCE,
+          status: "recovery_required",
+          recoveryRequired: true,
+          updatedAt: now,
+          ...metadata
+        }))
+      });
+      const data = await readJsonOrText(response);
+      if (!response.ok) throw new Error(errorMessage(data, `install_recovery_set_${response.status}`));
     },
     async createAuthAdmin(admin) {
       const response = await fetchImpl(`${root}/auth/v1/admin/users`, {
@@ -230,8 +312,61 @@ export function createSupabaseInstallClient({ url, serviceRoleKey, fetchImpl = g
         role: row?.role || "admin",
         active: row?.active !== false
       };
+    },
+    async deleteAppUserProfile(appUser = {}) {
+      const id = appUser?.id ? `id=eq.${encodeURIComponent(appUser.id)}` : "";
+      const authUserId = appUser?.authUserId ? `auth_user_id=eq.${encodeURIComponent(appUser.authUserId)}` : "";
+      const filter = id || authUserId;
+      if (!filter) return;
+      const response = await fetchImpl(`${appUsersBase}?${filter}`, {
+        method: "DELETE",
+        headers: serviceHeaders(serviceRoleKey, { prefer: "return=minimal" })
+      });
+      const data = await readJsonOrText(response);
+      if (!response.ok) throw new Error(errorMessage(data, `install_profile_delete_${response.status}`));
+    },
+    async deleteAuthUser(authUserId) {
+      const id = cleanString(authUserId);
+      if (!id) return;
+      const response = await fetchImpl(`${root}/auth/v1/admin/users/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        headers: serviceHeaders(serviceRoleKey)
+      });
+      const data = await readJsonOrText(response);
+      if (!response.ok) throw new Error(errorMessage(data, `install_auth_delete_${response.status}`));
     }
   };
+}
+
+async function readInstallState(client) {
+  const hasActiveAdmin = await client.hasExistingActiveAdmin();
+  const marker = typeof client.getPermanentInstallMarker === "function" ? await client.getPermanentInstallMarker() : null;
+  const recovery = typeof client.getInstallRecoveryState === "function" ? await client.getInstallRecoveryState() : null;
+  const lock = typeof client.getInstallLock === "function" ? await client.getInstallLock() : null;
+  return installStateFrom({ hasActiveAdmin, marker, lock, recovery });
+}
+
+async function cleanupCreatedIdentity(client, { authUser, appUser } = {}) {
+  if (appUser && typeof client.deleteAppUserProfile === "function") {
+    await client.deleteAppUserProfile(appUser);
+  }
+  if (authUser?.id && typeof client.deleteAuthUser === "function") {
+    await client.deleteAuthUser(authUser.id);
+  }
+  if (typeof client.clearInstallLock === "function") {
+    await client.clearInstallLock();
+  } else if (typeof client.markInstallLock === "function") {
+    await client.markInstallLock("cleanup_succeeded", { retryAllowed: true });
+  }
+}
+
+async function markRecoveryRequired(client, metadata = {}) {
+  if (typeof client.markInstallRecoveryRequired === "function") {
+    await client.markInstallRecoveryRequired(metadata);
+  }
+  if (typeof client.markInstallLock === "function") {
+    await client.markInstallLock("failed", { ...metadata, recoveryRequired: true });
+  }
 }
 
 export function createInstallHandler({
@@ -259,24 +394,26 @@ export function createInstallHandler({
     const backendAuditDriver = auditDriver || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
 
     try {
-      const hasActiveAdmin = await client.hasExistingActiveAdmin();
+      const initialState = await readInstallState(client);
       if (method === "HEAD") {
-        res.statusCode = hasActiveAdmin ? 200 : 204;
+        res.statusCode = initialState.state === "ready" ? 200 : 204;
         res.setHeader("cache-control", "no-store, max-age=0");
         return res.end();
       }
 
       if (method === "GET") {
-        if (hasActiveAdmin) return json(res, 200, installStateFrom({ hasActiveAdmin, lock: null }));
-        const lock = typeof client.getInstallLock === "function" ? await client.getInstallLock() : null;
-        return json(res, 200, installStateFrom({ hasActiveAdmin, lock }));
+        return json(res, 200, initialState);
       }
 
-      if (hasActiveAdmin) return json(res, 409, { error: "system_already_initialized" });
+      if (initialState.state === "ready") return json(res, 409, { error: "system_already_initialized" });
+      if (initialState.state === "admin_recovery_required") return json(res, 409, { error: "admin_recovery_required" });
+      if (initialState.state === "blocked" && initialState.reason === "install_in_progress") return json(res, 409, { error: "system_install_in_progress" });
 
       const body = await readBody(req);
       const validated = validateFirstRunAdminPayload(body);
       if (!validated.ok) return json(res, 400, { error: validated.error });
+      if (typeof backendAuditDriver?.write !== "function") return json(res, 503, { error: "install_audit_not_configured" });
+      if (typeof client.setPermanentInstallMarker !== "function") return json(res, 503, { error: "install_marker_not_configured" });
       if (typeof client.acquireInstallLock !== "function") return json(res, 503, { error: "install_lock_not_configured" });
 
       try {
@@ -286,9 +423,14 @@ export function createInstallHandler({
         throw error;
       }
 
-      if (await client.hasExistingActiveAdmin()) {
-        await client.markInstallLock?.("ready");
+      const lockedState = await readInstallState(client);
+      if (lockedState.state === "ready") {
+        await client.markInstallLock?.("completed", { permanentMarker: true });
         return json(res, 409, { error: "system_already_initialized" });
+      }
+      if (lockedState.state === "admin_recovery_required") {
+        await client.markInstallLock?.("failed", { recoveryRequired: true });
+        return json(res, 409, { error: "admin_recovery_required" });
       }
 
       let authUser = null;
@@ -302,13 +444,29 @@ export function createInstallHandler({
       let appUser = null;
       try {
         appUser = await client.createAppUserProfile(validated.admin, authUser);
+        await writeAuditEvent(backendAuditDriver, installAuditEvent(appUser, validated.admin));
+        if (typeof client.setPermanentInstallMarker !== "function") throw new Error("install_marker_not_configured");
+        await client.setPermanentInstallMarker({
+          appUserId: appUser.id || "",
+          authUserId: appUser.authUserId || authUser.id || "",
+          email: appUser.email || validated.admin.email || ""
+        });
       } catch (error) {
-        await client.markInstallLock?.("failed", { phase: "app_users", authUserCreated: true });
-        return sendServerError(req, res, error, { code: "install_profile_error", route: "/api/install" });
+        try {
+          await cleanupCreatedIdentity(client, { authUser, appUser });
+        } catch (cleanupError) {
+          await markRecoveryRequired(client, {
+            phase: appUser ? "completion" : "app_users",
+            authUserCreated: true,
+            appUserCreated: !!appUser,
+            cleanupFailed: true
+          });
+          return sendServerError(req, res, cleanupError, { code: "install_completion_recovery_required", route: "/api/install" });
+        }
+        return sendServerError(req, res, error, { code: "install_completion_error", route: "/api/install" });
       }
 
-      await client.markInstallLock?.("ready");
-      await writeAuditEvent(backendAuditDriver, installAuditEvent(appUser, validated.admin));
+      await client.markInstallLock?.("completed", { permanentMarker: true });
 
       return json(res, 201, {
         ok: true,

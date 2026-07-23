@@ -63,6 +63,49 @@ describe("bootstrap admin handler", () => {
     expect(res.json()).toEqual({ error: "supabase_admin_not_configured" });
   });
 
+  it("fails before creating auth when bootstrap audit is not configured", async () => {
+    const createAdmin = vi.fn();
+    const createAppUserProfile = vi.fn();
+    const hasExistingActiveAdmin = vi.fn().mockResolvedValue(false);
+    const handler = createBootstrapAdminHandler({
+      env: { CMMS_BOOTSTRAP_ENABLED: "true", CMMS_BOOTSTRAP_TOKEN: "secret" },
+      supabaseClient: { createAdmin, createAppUserProfile, hasExistingActiveAdmin }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer secret" },
+      body: { email: "admin@example.com", temporaryPassword: "long-password" }
+    });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({ error: "bootstrap_audit_not_configured" });
+    expect(createAdmin).not.toHaveBeenCalled();
+    expect(createAppUserProfile).not.toHaveBeenCalled();
+  });
+
+  it("fails before creating auth when bootstrap install marker writer is not configured", async () => {
+    const createAdmin = vi.fn();
+    const createAppUserProfile = vi.fn();
+    const hasExistingActiveAdmin = vi.fn().mockResolvedValue(false);
+    const auditDriver = { write: vi.fn() };
+    const handler = createBootstrapAdminHandler({
+      env: { CMMS_BOOTSTRAP_ENABLED: "true", CMMS_BOOTSTRAP_TOKEN: "secret" },
+      supabaseClient: { createAdmin, createAppUserProfile, hasExistingActiveAdmin },
+      auditDriver
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer secret" },
+      body: { email: "admin@example.com", temporaryPassword: "long-password" }
+    });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({ error: "bootstrap_install_marker_not_configured" });
+    expect(createAdmin).not.toHaveBeenCalled();
+    expect(createAppUserProfile).not.toHaveBeenCalled();
+    expect(auditDriver.write).not.toHaveBeenCalled();
+  });
+
   it("validates and normalizes the first admin payload", () => {
     expect(validateBootstrapAdminPayload({ email: "bad", temporaryPassword: "long-password" })).toEqual({
       ok: false,
@@ -99,9 +142,12 @@ describe("bootstrap admin handler", () => {
       active: true,
       mustChangePassword: true
     });
+    const auditDriver = { write: vi.fn().mockResolvedValue() };
+    const setPermanentInstallMarker = vi.fn().mockResolvedValue();
     const handler = createBootstrapAdminHandler({
       env: { CMMS_BOOTSTRAP_ENABLED: "true", CMMS_BOOTSTRAP_TOKEN: "secret" },
-      supabaseClient: { createAdmin, createAppUserProfile }
+      supabaseClient: { createAdmin, createAppUserProfile, setPermanentInstallMarker },
+      auditDriver
     });
 
     const res = await call(handler, {
@@ -135,6 +181,14 @@ describe("bootstrap admin handler", () => {
       role: "admin",
       mustChangePassword: true
     }), expect.objectContaining({ id: "auth-user-1" }));
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      entityType: "user",
+      action: "bootstrap"
+    }));
+    expect(setPermanentInstallMarker).toHaveBeenCalledWith(expect.objectContaining({
+      source: "bootstrap",
+      appUserId: "app-user-1"
+    }));
   });
 
   it("does not report bootstrap success if the app profile insert fails after auth creation", async () => {
@@ -143,7 +197,8 @@ describe("bootstrap admin handler", () => {
     const createAppUserProfile = vi.fn().mockRejectedValue(new Error("profile_insert_failed"));
     const handler = createBootstrapAdminHandler({
       env: { CMMS_BOOTSTRAP_ENABLED: "true", CMMS_BOOTSTRAP_TOKEN: "secret" },
-      supabaseClient: { createAdmin, createAppUserProfile }
+      supabaseClient: { createAdmin, createAppUserProfile, setPermanentInstallMarker: vi.fn() },
+      auditDriver: { write: vi.fn().mockResolvedValue() }
     });
 
     try {
@@ -191,6 +246,76 @@ describe("bootstrap admin handler", () => {
     expect(hasExistingActiveAdmin).toHaveBeenCalledTimes(1);
     expect(createAdmin).not.toHaveBeenCalled();
     expect(createAppUserProfile).not.toHaveBeenCalled();
+  });
+
+  it("blocks bootstrap recovery for an initialized system unless recovery mode is explicitly enabled", async () => {
+    const createAdmin = vi.fn();
+    const createAppUserProfile = vi.fn();
+    const hasExistingActiveAdmin = vi.fn().mockResolvedValue(false);
+    const getPermanentInstallMarker = vi.fn().mockResolvedValue({ config: { status: "completed" } });
+    const handler = createBootstrapAdminHandler({
+      env: { CMMS_BOOTSTRAP_ENABLED: "true", CMMS_BOOTSTRAP_TOKEN: "secret" },
+      supabaseClient: { createAdmin, createAppUserProfile, hasExistingActiveAdmin, getPermanentInstallMarker }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer secret" },
+      body: { email: "admin@example.com", name: "Owner", temporaryPassword: "long-password" }
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: "admin_recovery_requires_explicit_bootstrap" });
+    expect(createAdmin).not.toHaveBeenCalled();
+    expect(createAppUserProfile).not.toHaveBeenCalled();
+  });
+
+  it("allows env-gated admin recovery bootstrap and records audit plus install marker", async () => {
+    const createAdmin = vi.fn().mockResolvedValue({ id: "auth-user-1", email: "admin@example.com", role: "admin", mustChangePassword: true });
+    const createAppUserProfile = vi.fn().mockResolvedValue({
+      id: "app-user-1",
+      authUserId: "auth-user-1",
+      email: "admin@example.com",
+      role: "admin",
+      active: true,
+      mustChangePassword: true
+    });
+    const hasExistingActiveAdmin = vi.fn().mockResolvedValue(false);
+    const getPermanentInstallMarker = vi.fn().mockResolvedValue({ config: { status: "completed" } });
+    const setPermanentInstallMarker = vi.fn().mockResolvedValue();
+    const auditDriver = { write: vi.fn().mockResolvedValue() };
+    const handler = createBootstrapAdminHandler({
+      env: {
+        CMMS_BOOTSTRAP_ENABLED: "true",
+        CMMS_BOOTSTRAP_TOKEN: "secret",
+        CMMS_BOOTSTRAP_ALLOW_ADMIN_RECOVERY: "true"
+      },
+      supabaseClient: {
+        createAdmin,
+        createAppUserProfile,
+        hasExistingActiveAdmin,
+        getPermanentInstallMarker,
+        setPermanentInstallMarker
+      },
+      auditDriver
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer secret" },
+      body: { email: "admin@example.com", name: "Owner", temporaryPassword: "long-password" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: true, disableBootstrapAfterSuccess: true });
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      entityType: "user",
+      action: "bootstrap",
+      actorName: "admin-recovery-bootstrap"
+    }));
+    expect(setPermanentInstallMarker).toHaveBeenCalledWith(expect.objectContaining({
+      source: "bootstrap",
+      recovery: true,
+      appUserId: "app-user-1"
+    }));
   });
 
   it("builds the app user profile row from the auth user", () => {

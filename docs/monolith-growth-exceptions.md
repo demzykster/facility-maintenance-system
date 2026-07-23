@@ -137,3 +137,10 @@ Each exception must include:
 - Why necessary: the production public entry shell still owns unauthenticated route presentation, dynamic branding, language/theme controls, and the existing login redirect surface; the new `/install` screen needs minimal shell wiring so an empty environment can create the first ordinary admin and then return to the normal login screen without changing the authentication flow.
 - Why extraction was not the right move: the first-run authority and validation live in `server/install/handler.js` and `src/productionLoginAdapter.js`; extracting the whole public login/install surface would be broader than this bounded first-admin creation goal.
 - Follow-up/removal condition: when the public entry and authentication screens move into a dedicated module/stylesheet, move `FirstRunInstall` and its small presentation rules with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
+
+- Date: 2026-07-23
+- Owner goal: Ogen R11.8 completion for permanent install state and recovery safety.
+- New line count: 10246.
+- Why necessary: the unauthenticated shell still decides whether to render login or the existing `/install` surface; this completion adds only the minimal recovery-state presentation and server-confirmed redirect wiring so `ADMIN_RECOVERY_REQUIRED` does not expose the first-run form.
+- Why extraction was not the right move: the state decision is now isolated in `src/firstRunInstallStateModel.js`, while extracting the entire public auth/install surface would be broader than this security hardening goal.
+- Follow-up/removal condition: when public auth/install screens move into a dedicated module, move this recovery-state wiring with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.

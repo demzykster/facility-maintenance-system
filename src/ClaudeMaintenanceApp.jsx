@@ -39,6 +39,7 @@ import { AI_MODES, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
 import { changeProductionPassword, completeProductionInitialPassword, createFirstRunAdmin, createProductionAuthStore, fetchFirstRunInstallState, loginWithProductionPassword, loginWithProductionPin, logoutProductionSession, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionNotificationReadState, updateProductionProfile, validateProductionInitialPassword } from "./productionLoginAdapter.js";
+import { canShowFirstRunInstallForm, firstRunInstallStateKind, shouldRedirectLoginToInstall } from "./firstRunInstallStateModel.js";
 import { isOperationallyOverdue } from "./slaModel.js";
 import { DEFAULT_TICKET_SLA_HOURS, resolveTicketSlaHours } from "./ticketSlaPolicyModel.js";
 import { applyTicketPriorityUpdate } from "./ticketPriorityUpdateModel.js";
@@ -1830,7 +1831,7 @@ export default function App() {
         const installState = await fetchFirstRunInstallState({ config: PRODUCTION_LOGIN_CONFIG });
         if (!cancelled) {
           setFirstRunInstallState(installState);
-          if (installState?.state === "new" && typeof window !== "undefined" && window.location.pathname !== "/install") {
+          if (shouldRedirectLoginToInstall(installState) && typeof window !== "undefined" && window.location.pathname !== "/install") {
             window.history.replaceState(null, "", "/install");
           }
         }
@@ -4150,7 +4151,9 @@ function FirstRunInstall({ config, publicBrandChecked = false, installState = nu
   const [done, setDone] = useState(false);
   const brandName = brandCompanyName(config), brandSubtitle = brandSiteSubtitle(config), showHeroBrandCopy = publicBrandChecked || brandName !== DEFAULT_COMPANY_NAME || brandSubtitle !== DEFAULT_SITE_SUBTITLE || !!config?.brandLogo;
   const state = installState?.state || "unknown";
-  const locked = state === "ready" || state === "blocked" || installState?.ok === false;
+  const stateKind = firstRunInstallStateKind(installState);
+  const canShowForm = canShowFirstRunInstallForm(installState);
+  const locked = !canShowForm;
   const goToLogin = () => {
     if (typeof window !== "undefined") window.history.replaceState(null, "", "/");
     onInstalled({ ok: true, state: "ready" });
@@ -4204,15 +4207,20 @@ function FirstRunInstall({ config, publicBrandChecked = false, installState = nu
             <div className="login-card-head">
               <div className="brand login-title-brand"><BrandMark logo={config?.brandLogo} /><div className="login-card-title">התקנה ראשונית</div></div>
             </div>
-            {installState?.ok === false ? <>
+            {stateKind === "state_check_failed" ? <>
               <div className="install-state danger"><AlertTriangle size={18} />לא ניתן לבדוק את מצב ההתקנה כרגע. נסו שוב לאחר בדיקת השרת.</div>
               <button type="button" className="btn-ghost full" onClick={goToLogin}>{t("login.back")}</button>
-            </> : state === "ready" ? <>
+            </> : stateKind === "ready" ? <>
               <div className="install-state success"><ShieldCheck size={18} />המערכת כבר מוכנה לשימוש.</div>
               <button type="button" className="btn-primary full" onClick={goToLogin}>{t("login.signIn")}</button>
-            </> : state === "blocked" ? <>
+            </> : stateKind === "admin_recovery_required" ? <>
+              <div className="install-state danger"><AlertTriangle size={18} />המערכת כבר אותחלה, אך אין מנהל פעיל. נדרש שחזור גישה מנהלית.</div>
+              <button type="button" className="btn-ghost full" onClick={goToLogin}>{t("login.back")}</button>
+            </> : stateKind === "install_in_progress" ? <>
               <div className="install-state danger"><AlertTriangle size={18} />התקנה קודמת לא הסתיימה. נדרש טיפול ידני לפני יצירת מנהל נוסף.</div>
               <button type="button" className="btn-ghost full" onClick={goToLogin}>{t("login.back")}</button>
+            </> : stateKind === "checking" ? <>
+              <div className="install-state"><ShieldCheck size={18} />בודקים את מצב ההתקנה…</div>
             </> : done ? <>
               <div className="install-state success"><ShieldCheck size={18} />מנהל המערכת נוצר. ניתן להתחבר כעת.</div>
               <button type="button" className="btn-primary full" onClick={goToLogin}>{t("login.signIn")}</button>

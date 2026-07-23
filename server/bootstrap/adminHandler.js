@@ -1,4 +1,6 @@
 import { sendServerError } from "../httpErrors.js";
+import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, normalizeAuditEvent } from "../../src/auditEventModel.js";
+import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -7,6 +9,7 @@ const json = (res, status, body) => {
 };
 
 const parseEnabled = (value) => value === true || value === "1" || value === "true";
+const INSTALL_MARKER_ID = "install:completed";
 
 const getHeader = (headers = {}, name) => {
   const direct = headers[name] || headers[name.toLowerCase()] || headers[name.toUpperCase()];
@@ -67,6 +70,29 @@ export function buildBootstrapAppUserProfile(admin, authUser) {
     must_change_password: true
   };
 }
+
+const completedInstallMarker = (marker) => {
+  const config = marker?.config || {};
+  return config.status === "completed" || config.firstInstallCompleted === true;
+};
+
+const bootstrapAuditEvent = (appUser = {}, options = {}) => normalizeAuditEvent({
+  at: Date.now(),
+  actorId: "system",
+  actorName: options.recovery ? "admin-recovery-bootstrap" : "bootstrap",
+  actorRole: "system",
+  entityType: AUDIT_ENTITY_TYPES.user,
+  entityId: appUser.id || appUser.authUserId || appUser.email || "admin",
+  action: AUDIT_ACTIONS.bootstrap,
+  summary: options.recovery ? "Admin recovered through env-gated bootstrap" : "First admin created through bootstrap",
+  after: {
+    id: appUser.id || "",
+    email: appUser.email || "",
+    role: "admin",
+    active: true
+  },
+  metadata: { source: "bootstrap", recovery: options.recovery === true }
+});
 
 export function bootstrapAuthorization(req, env = {}) {
   const configuredToken = String(env.CMMS_BOOTSTRAP_TOKEN || "");
@@ -149,6 +175,50 @@ export function createSupabaseAdminBootstrapClient({ url, serviceRoleKey, fetchI
       }
       return Array.isArray(data) && data.length > 0;
     },
+    async getPermanentInstallMarker() {
+      const response = await fetchImpl(`${root}/rest/v1/app_config?id=eq.${encodeURIComponent(INSTALL_MARKER_ID)}&select=id,config,updated_at&limit=1`, {
+        method: "GET",
+        headers: {
+          apikey: serviceRoleKey,
+          authorization: `Bearer ${serviceRoleKey}`
+        }
+      });
+
+      const data = await responseJson(response);
+      if (!response.ok) {
+        throw new Error(data?.message || data?.details || data?.hint || data?.code || `supabase_install_marker_${response.status}`);
+      }
+      return Array.isArray(data) ? data[0] : data;
+    },
+    async setPermanentInstallMarker(metadata = {}) {
+      const now = new Date().toISOString();
+      const response = await fetchImpl(`${root}/rest/v1/app_config?on_conflict=id`, {
+        method: "POST",
+        headers: {
+          apikey: serviceRoleKey,
+          authorization: `Bearer ${serviceRoleKey}`,
+          "content-type": "application/json",
+          prefer: "resolution=merge-duplicates,return=minimal"
+        },
+        body: JSON.stringify({
+          id: INSTALL_MARKER_ID,
+          source_kv_key: INSTALL_MARKER_ID,
+          legacy_payload: {},
+          config: {
+            source: "bootstrap",
+            status: "completed",
+            firstInstallCompleted: true,
+            completedAt: now,
+            updatedAt: now,
+            ...metadata
+          }
+        })
+      });
+      const data = await responseJson(response);
+      if (!response.ok) {
+        throw new Error(data?.message || data?.details || data?.hint || data?.code || `supabase_install_marker_set_${response.status}`);
+      }
+    },
     async createAppUserProfile(admin, authUser) {
       if (!authUser?.id) throw new Error("supabase_auth_user_id_missing");
       const profile = buildBootstrapAppUserProfile(admin, authUser);
@@ -184,6 +254,7 @@ export function createSupabaseAdminBootstrapClient({ url, serviceRoleKey, fetchI
 export function createBootstrapAdminHandler({
   env = process.env,
   supabaseClient = null,
+  auditDriver = null,
   fetchImpl = globalThis.fetch
 } = {}) {
   return async function bootstrapAdminHandler(req, res) {
@@ -208,6 +279,7 @@ export function createBootstrapAdminHandler({
     if (!client || typeof client.createAdmin !== "function" || typeof client.createAppUserProfile !== "function") {
       return json(res, 503, { error: "supabase_admin_not_configured" });
     }
+    const backendAuditDriver = auditDriver || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
 
     try {
       const body = await readBody(req);
@@ -216,6 +288,17 @@ export function createBootstrapAdminHandler({
 
       if (typeof client.hasExistingActiveAdmin === "function" && await client.hasExistingActiveAdmin()) {
         return json(res, 409, { error: "bootstrap_admin_already_exists" });
+      }
+      const marker = typeof client.getPermanentInstallMarker === "function" ? await client.getPermanentInstallMarker() : null;
+      const recovery = completedInstallMarker(marker);
+      if (recovery && !parseEnabled(env.CMMS_BOOTSTRAP_ALLOW_ADMIN_RECOVERY)) {
+        return json(res, 409, { error: "admin_recovery_requires_explicit_bootstrap" });
+      }
+      if (typeof backendAuditDriver?.write !== "function") {
+        return json(res, 503, { error: "bootstrap_audit_not_configured" });
+      }
+      if (typeof client.setPermanentInstallMarker !== "function") {
+        return json(res, 503, { error: "bootstrap_install_marker_not_configured" });
       }
 
       const admin = await client.createAdmin(validated.admin);
@@ -232,6 +315,14 @@ export function createBootstrapAdminHandler({
           }
         });
       }
+      await backendAuditDriver.write(bootstrapAuditEvent(appUser, { recovery }));
+      await client.setPermanentInstallMarker({
+        source: "bootstrap",
+        recovery,
+        appUserId: appUser.id || "",
+        authUserId: appUser.authUserId || admin.id || "",
+        email: appUser.email || validated.admin.email || ""
+      });
       return json(res, 200, {
         ok: true,
         admin,
