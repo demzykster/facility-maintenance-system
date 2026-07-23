@@ -1,6 +1,6 @@
 # Operational Documentation Inventory
 
-Last verified against local commit: `24213dc` with production/origin baseline `567a5f9`.
+Last verified against local commit: `5983f23` with production/origin baseline `5983f23`.
 
 Status meanings:
 
@@ -23,7 +23,7 @@ Status meanings:
 | `docs/operations/business-continuity-guide.md` | `CURRENT_WITH_GAPS` | Owner contacts/access details remain `OWNER TO DEFINE`. |
 | `docs/operations/access-and-dependency-register.md` | `CURRENT_WITH_GAPS` | DNS provider and account owners need owner confirmation. |
 | `docs/operations/environment-reference.md` | `CURRENT_WITH_GAPS` | Names verified from code/workflows/templates; secret values intentionally absent. |
-| `docs/operations/first-run-installation.md` | `CURRENT` | First admin creation for a brand-new empty environment; active admin count is the source of truth. |
+| `docs/operations/first-run-installation.md` | `CURRENT` | First admin creation for a brand-new empty environment; permanent install marker plus active admin rows are the source of truth. |
 | `docs/operations/checklists/daily-health.md` | `CURRENT` | Read-only daily checklist. |
 | `docs/operations/checklists/release.md` | `CURRENT` | Production release checklist. |
 | `docs/operations/checklists/incident.md` | `CURRENT` | Incident checklist. |
@@ -38,6 +38,7 @@ Status meanings:
 | `docs/platform-portability-runbook.md` | `CURRENT_WITH_GAPS` | Local R11.6 result; non-Vercel targets require adapter. |
 | `docs/platform-portability-checklist.md` | `CURRENT_WITH_GAPS` | Use before future platform experiment. |
 | `docs/security-reconciliation-r11.md` | `CURRENT_WITH_GAPS` | Reconciled findings; open owner decisions remain. |
+| `docs/audits/night-mode-technical-debt-sprint-1.md` | `CURRENT` | Night Mode sprint #1 read-only technical-debt and architecture-state audit. |
 | `docs/supabase-vercel-setup-checklist.md` | `CURRENT_WITH_GAPS` | Setup guide; verify against current env/migrations before use. |
 | `docs/staging-smoke.md` | `CURRENT_WITH_GAPS` | Useful smoke docs; some staging language should be interpreted as production-like live pilot. |
 | `docs/release-checklist.md` | `CURRENT_WITH_GAPS` | Detailed historical release checklist; use `docs/operations/checklists/release.md` first. |
@@ -60,6 +61,6 @@ Status meanings:
 
 ## Contradictions Reconciled
 
-- Old `docs/current-state.md` baseline `b052082` was replaced with the R12 verified baseline.
+- Old `docs/current-state.md` baseline `b052082` was replaced with the R12 verified baseline, and Night Mode sprint #1 refreshed the deployed baseline to `5983f23`.
 - Older handoffs and status files that cite old SHAs remain historical evidence, not current state.
 - R11.5 and R11.6 runbooks contain their own audit-time SHAs; these are not current-state claims unless re-verified.

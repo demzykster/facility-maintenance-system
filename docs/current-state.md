@@ -1,6 +1,6 @@
 # Current State
 
-Last verified for R12 documentation work: 2026-07-23.
+Last verified for Night Mode technical-debt sprint #1: 2026-07-24.
 
 This file is the compact current-status source for the repository. It does not replace live verification. Before a production claim, release, rollback, restore, domain change, or platform move, re-check Git, production `/cmms-version.json`, production `/api/health`, CI, Vercel, and Supabase as applicable.
 
@@ -9,12 +9,9 @@ This file is the compact current-status source for the repository. It does not r
 - Repository: `demzykster/facility-maintenance-system`.
 - Primary branch: `main`.
 - Current production URL: `https://facility-maintenance-system.vercel.app`.
-- Current production reference at R12 start: `origin/main = production = 567a5f9571537c7afb82c88671aeac12aee8ca3c`.
-- Local R11.6 documentation/tooling work at R12 start: `main` ahead of `origin/main` by two local commits:
-  - `c9ec5be` — `Add platform portability verification`
-  - `24213dc` — `Document hosting migration readiness`
-- Production `/cmms-version.json` at R12 start: `567a5f9`.
-- Production `/api/health` at R12 start: `ok`.
+- Current production reference: `HEAD = origin/main = production = 5983f236bd9388f98e92c97326301c9a8e4076f4`.
+- Production `/cmms-version.json` verified on 2026-07-24: `5983f23`.
+- Production `/api/health` verified on 2026-07-24: `ok`.
 - Package manager: npm with `package-lock.json`.
 - CI workflow: `.github/workflows/ci.yml`, Node 24.
 - Deployment model: Vercel project `facility-maintenance-system` serving Vite static assets and Vercel Functions under `api/`.
@@ -27,7 +24,7 @@ This file is the compact current-status source for the repository. It does not r
 - `docs/operations/README.md` is the operational entry point for owners/operators.
 - `docs/operations/runbook-index.md` maps canonical operational runbooks.
 - `docs/architecture-rules.md` and `docs/decisions/` contain durable architecture and ADR rules.
-- `docs/platform-portability-runbook.md` and `docs/platform-portability-checklist.md` record R11.6 local platform portability findings. They are local until pushed/deployed by a later approved goal.
+- `docs/platform-portability-runbook.md` and `docs/platform-portability-checklist.md` record R11.6 platform portability findings.
 
 Historical handoffs, audits, archived reports, and old ledgers remain useful evidence, but they do not override current code, Git, production health/version, or this file.
 
@@ -37,8 +34,11 @@ Historical handoffs, audits, archived reports, and old ledgers remain useful evi
 - R9 Monitoring: documented in `docs/monitoring-runbook.md`; manual GitHub health workflow exists.
 - R10 Rollback/incident readiness: documented in `docs/rollback-checklist.md` and `docs/incident-response-runbook.md`.
 - R11 Security reconciliation: documented in `docs/security-reconciliation-r11.md`.
-- R11.5 Domain portability: documented in `docs/domain-change-runbook.md` and `docs/domain-change-checklist.md`; deployed baseline is `567a5f9`.
-- R11.6 Platform portability: local docs/tooling complete on top of `567a5f9`; current finding is `SMALL_ADAPTER_REQUIRED` for non-Vercel full runtime because there is no production Node API entrypoint.
+- R11.5 Domain portability: documented in `docs/domain-change-runbook.md` and `docs/domain-change-checklist.md`.
+- R11.6 Platform portability: documented in `docs/platform-portability-runbook.md` and `docs/platform-portability-checklist.md`; current finding is `SMALL_ADAPTER_REQUIRED` for non-Vercel full runtime because there is no production Node API entrypoint.
+- R12 documentation guardrails: documented in `docs/operations/` and enforced by `npm run docs:verify`.
+- R11.7 identity and authority verification: documented in `docs/audits/identity-and-business-authority-audit.md` and checked by `npm run authority:verify`.
+- R11.8 first-run installation hardening: `/api/install` and `/install` are deployed; existing production currently reports `state = ready` with `reason = legacy_marker_missing`, so first-run remains closed without a production marker backfill.
 
 ## Current Operational Facts
 
@@ -52,6 +52,7 @@ Historical handoffs, audits, archived reports, and old ledgers remain useful evi
 - `npm run domain:verify` is read-only and requires explicit URLs.
 - `npm run platform:verify` is local/read-only and does not deploy, call production, or print secret values.
 - `npm run docs:verify` is the R12 local documentation guardrail once added.
+- `/api/install` is public/read-only for `GET`/`HEAD`; `POST` must never be used against an existing live system without explicit owner-approved install/recovery work.
 
 ## AI and Business Operation Boundary
 
@@ -83,5 +84,6 @@ These files preserve useful history but must not be treated as current state wit
 - Non-Vercel target platform, if any, for a future hosting migration.
 - Whether to implement a small Node API adapter for Docker/Cloud Run/Azure readiness.
 - Secrets recovery/rotation ownership outside repository evidence.
+- Whether to backfill the permanent first-run install marker for the existing live production instance.
 
 Do not start any next operational or product stage without an explicit owner goal.

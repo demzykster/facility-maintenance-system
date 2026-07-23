@@ -9,7 +9,7 @@ Ogen is the live CMMS application for maintenance, fleet, PPE, suppliers, tasks,
 ## Current Production Shape
 
 - Production URL: `https://facility-maintenance-system.vercel.app`
-- Current production baseline at R12 start: `567a5f9571537c7afb82c88671aeac12aee8ca3c`
+- Current production baseline verified on 2026-07-24: `5983f236bd9388f98e92c97326301c9a8e4076f4`
 - Deployment platform: Vercel
 - API model: Vercel Functions under `api/`, delegating to `server/` handlers
 - Data/auth/storage/audit: Supabase-backed

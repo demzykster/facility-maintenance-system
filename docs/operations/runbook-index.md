@@ -1,6 +1,6 @@
 # Operations Runbook Index
 
-Last verified against local commit: `24213dc` with production/origin baseline `567a5f9`.
+Last verified against local commit: `5983f23` with production/origin baseline `5983f23`.
 
 This index maps canonical operational documentation. It is not an approval to execute production changes.
 
