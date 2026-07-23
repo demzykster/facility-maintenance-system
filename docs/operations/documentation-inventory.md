@@ -23,10 +23,12 @@ Status meanings:
 | `docs/operations/business-continuity-guide.md` | `CURRENT_WITH_GAPS` | Owner contacts/access details remain `OWNER TO DEFINE`. |
 | `docs/operations/access-and-dependency-register.md` | `CURRENT_WITH_GAPS` | DNS provider and account owners need owner confirmation. |
 | `docs/operations/environment-reference.md` | `CURRENT_WITH_GAPS` | Names verified from code/workflows/templates; secret values intentionally absent. |
+| `docs/operations/first-run-installation.md` | `CURRENT` | First admin creation for a brand-new empty environment; active admin count is the source of truth. |
 | `docs/operations/checklists/daily-health.md` | `CURRENT` | Read-only daily checklist. |
 | `docs/operations/checklists/release.md` | `CURRENT` | Production release checklist. |
 | `docs/operations/checklists/incident.md` | `CURRENT` | Incident checklist. |
 | `docs/operations/checklists/quarterly-readiness.md` | `CURRENT` | Periodic readiness checklist. |
+| `docs/operations/checklists/first-run-install.md` | `CURRENT` | Checklist for `/install` on a disposable or brand-new environment only. |
 | `docs/monitoring-runbook.md` | `CURRENT` | R9 monitoring; manual workflow only. |
 | `docs/incident-response-runbook.md` | `CURRENT` | R10 incident response. |
 | `docs/rollback-checklist.md` | `CURRENT` | Owner-approved rollback only. |

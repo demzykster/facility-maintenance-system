@@ -34,6 +34,7 @@ curl -fsS https://facility-maintenance-system.vercel.app/api/health
 - [Access and dependency register](access-and-dependency-register.md)
 - [Environment reference](environment-reference.md)
 - [Documentation inventory](documentation-inventory.md)
+- [First-run installation](first-run-installation.md)
 
 Core existing runbooks:
 
@@ -46,6 +47,7 @@ Core existing runbooks:
 - [Platform portability runbook](../platform-portability-runbook.md)
 - [Platform portability checklist](../platform-portability-checklist.md)
 - [Security reconciliation R11](../security-reconciliation-r11.md)
+- [First-run install checklist](checklists/first-run-install.md)
 
 ## First Response Rules
 
