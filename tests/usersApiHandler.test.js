@@ -1199,4 +1199,98 @@ describe("users API handler", () => {
       action: "delete"
     }));
   });
+
+  it("prevents deleting the last active admin app_user", async () => {
+    const profileClient = {
+      getAppUserProfileById: vi.fn().mockResolvedValue({
+        id: "admin-1",
+        auth_user_id: "auth-admin-1",
+        role: "admin",
+        active: true
+      }),
+      hasOtherActiveAdmin: vi.fn().mockResolvedValue(false),
+      updateAppUserProfile: vi.fn()
+    };
+    const handler = createUsersApiHandler({
+      driver: { delete: vi.fn() },
+      profileClient,
+      sessionClient: sessionClientFor({ permissions: { users: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "DELETE",
+      headers: { authorization: "Bearer manager-token" },
+      query: { id: "admin-1" }
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: "last_active_admin_required" });
+    expect(profileClient.updateAppUserProfile).not.toHaveBeenCalled();
+  });
+
+  it("allows deleting an admin when another active admin exists", async () => {
+    const profileClient = {
+      getAppUserProfileById: vi.fn().mockResolvedValue({
+        id: "admin-1",
+        auth_user_id: "auth-admin-1",
+        role: "admin",
+        active: true
+      }),
+      hasOtherActiveAdmin: vi.fn().mockResolvedValue(true),
+      updateAppUserProfile: vi.fn().mockResolvedValue({ id: "admin-1", active: false })
+    };
+    const handler = createUsersApiHandler({
+      driver: { delete: vi.fn() },
+      profileClient,
+      sessionClient: sessionClientFor({ permissions: { users: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "DELETE",
+      headers: { authorization: "Bearer manager-token" },
+      query: { id: "admin-1" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(profileClient.hasOtherActiveAdmin).toHaveBeenCalledWith({ authUserId: "auth-admin-1", id: "admin-1" });
+    expect(profileClient.updateAppUserProfile).toHaveBeenCalledWith("auth-admin-1", { active: false });
+  });
+
+  it("prevents demoting the last active admin through user update", async () => {
+    const profileClient = {
+      getAppUserProfileByAuthUserId: vi.fn().mockResolvedValue({
+        id: "admin-1",
+        auth_user_id: "auth-admin-1",
+        role: "admin",
+        active: true
+      }),
+      hasOtherActiveAdmin: vi.fn().mockResolvedValue(false),
+      updateAuthEmail: vi.fn(),
+      updateAppUserProfile: vi.fn()
+    };
+    const handler = createUsersApiHandler({
+      driver: { set: vi.fn() },
+      profileClient,
+      sessionClient: sessionClientFor({ permissions: { users: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer manager-token" },
+      body: {
+        user: {
+          id: "admin-1",
+          authUserId: "auth-admin-1",
+          name: "Owner",
+          role: "user",
+          active: true,
+          email: "owner@example.com"
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: "last_active_admin_required" });
+    expect(profileClient.updateAppUserProfile).not.toHaveBeenCalled();
+  });
 });

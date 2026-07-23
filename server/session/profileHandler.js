@@ -93,6 +93,32 @@ export function createSupabaseProfileUpdateClient({ url, anonKey, serviceRoleKey
       if (!response.ok) throw new Error(data?.message || data?.error || `supabase_profile_get_${response.status}`);
       return Array.isArray(data) ? data[0] : data;
     },
+    async getAppUserProfileByAuthUserId(authUserId) {
+      const response = await fetchImpl(`${root}/rest/v1/app_users?auth_user_id=eq.${encodeURIComponent(authUserId)}&select=*&limit=1`, {
+        method: "GET",
+        headers: serviceHeaders
+      });
+      const data = await responseJson(response);
+      if (!response.ok) throw new Error(data?.message || data?.error || `supabase_profile_get_${response.status}`);
+      return Array.isArray(data) ? data[0] : data;
+    },
+    async hasOtherActiveAdmin({ authUserId = "", id = "" } = {}) {
+      const filters = [
+        "role=eq.admin",
+        "active=is.true",
+        "select=id",
+        "limit=1"
+      ];
+      if (authUserId) filters.push(`auth_user_id=neq.${encodeURIComponent(authUserId)}`);
+      if (id) filters.push(`id=neq.${encodeURIComponent(id)}`);
+      const response = await fetchImpl(`${root}/rest/v1/app_users?${filters.join("&")}`, {
+        method: "GET",
+        headers: serviceHeaders
+      });
+      const data = await responseJson(response);
+      if (!response.ok) throw new Error(data?.message || data?.error || `supabase_profile_admin_count_${response.status}`);
+      return Array.isArray(data) && data.length > 0;
+    },
     async listAppUserProfiles() {
       const response = await fetchImpl(`${root}/rest/v1/app_users?select=*&order=name.asc`, {
         method: "GET",

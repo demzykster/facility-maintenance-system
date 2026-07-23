@@ -36,6 +36,21 @@ const ALLOWED_PATCH_FIELDS = new Set([
   "supplier"
 ]);
 
+const disablesAdminAccess = (patch = {}) =>
+  patch.active === false || (Object.prototype.hasOwnProperty.call(patch, "role") && patch.role !== "admin");
+
+async function ensureNotLastActiveAdmin(client, authUserId, patch = {}) {
+  if (!disablesAdminAccess(patch)) return { ok: true };
+  if (typeof client?.getAppUserProfileByAuthUserId !== "function" || typeof client?.hasOtherActiveAdmin !== "function") {
+    return { ok: false, error: "last_admin_guard_not_configured" };
+  }
+  const target = await client.getAppUserProfileByAuthUserId(authUserId);
+  if (!target || target.role !== "admin" || target.active === false) return { ok: true };
+  const hasOther = await client.hasOtherActiveAdmin({ authUserId, id: target.id || "" });
+  if (!hasOther) return { ok: false, error: "last_active_admin_required" };
+  return { ok: true };
+}
+
 export function validateAdminProfilePayload(body = {}) {
   const authUserId = normalizeString(body.authUserId);
   if (!authUserId) return { ok: false, error: "auth_user_id_required" };
@@ -103,6 +118,9 @@ export function createAdminProfileHandler({
       const actorSession = buildSessionPayload(actorAuthUser, actorProfile);
       if (!actorSession.ok) return json(res, actorSession.error === "app_user_disabled" ? 403 : 401, { error: actorSession.error });
       if (actorSession.user.role !== "admin") return json(res, 403, { error: "admin_required" });
+
+      const lastAdmin = await ensureNotLastActiveAdmin(client, validated.authUserId, validated.patch);
+      if (!lastAdmin.ok) return json(res, lastAdmin.error === "last_active_admin_required" ? 409 : 503, { error: lastAdmin.error });
 
       if (validated.patch.email) {
         await client.updateAuthEmail(validated.authUserId, validated.patch.email);

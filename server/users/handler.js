@@ -77,6 +77,34 @@ const OPTIONAL_APP_USERS_PROFILE_FIELDS = new Set([
 const supabaseMissingAppUsersColumn = (error) =>
   /PGRST204|schema cache|could not find .*column|column .* does not exist/i.test(String(error?.message || error || ""));
 
+const deactivatesOrDemotesAdmin = (before = {}, after = {}) => (
+  before?.role === "admin"
+  && before?.active !== false
+  && (after?.active === false || (after?.role && after.role !== "admin"))
+);
+
+async function ensureNotLastActiveAdmin(profileClient, existingUser = {}) {
+  if (!deactivatesOrDemotesAdmin(existingUser, { ...existingUser, active: false })) return { ok: true };
+  if (typeof profileClient?.hasOtherActiveAdmin !== "function") return { ok: false, error: "last_admin_guard_not_configured" };
+  const hasOther = await profileClient.hasOtherActiveAdmin({
+    authUserId: existingUser.authUserId || "",
+    id: existingUser.id || ""
+  });
+  if (!hasOther) return { ok: false, error: "last_active_admin_required" };
+  return { ok: true };
+}
+
+async function ensureUserPatchDoesNotRemoveLastAdmin(profileClient, existingUser = {}, nextUser = {}) {
+  if (!deactivatesOrDemotesAdmin(existingUser, nextUser)) return { ok: true };
+  if (typeof profileClient?.hasOtherActiveAdmin !== "function") return { ok: false, error: "last_admin_guard_not_configured" };
+  const hasOther = await profileClient.hasOtherActiveAdmin({
+    authUserId: existingUser.authUserId || "",
+    id: existingUser.id || ""
+  });
+  if (!hasOther) return { ok: false, error: "last_active_admin_required" };
+  return { ok: true };
+}
+
 export function stripOptionalAppUsersProfileFields(patch = {}) {
   return Object.fromEntries(
     Object.entries(patch || {}).filter(([field]) => !OPTIONAL_APP_USERS_PROFILE_FIELDS.has(field))
@@ -411,6 +439,9 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
           const profile = await backendProfileClient.getAppUserProfileById(id);
           const appUser = profile ? normalizeSupabaseAppUserProfile(profile) : null;
           if (appUser?.authUserId) {
+            const existingUser = userRecordFromAppUserProfile(profile, {});
+            const lastAdmin = await ensureNotLastActiveAdmin(backendProfileClient, existingUser);
+            if (!lastAdmin.ok) return json(res, lastAdmin.error === "last_active_admin_required" ? 409 : 503, { error: lastAdmin.error });
             await backendProfileClient.updateAppUserProfile(appUser.authUserId, { active: false });
             deactivatedProfile = true;
           }
@@ -438,10 +469,19 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
       }
       if (user.authUserId) {
         if (!backendProfileClient) return json(res, 503, { error: "users_profile_backend_not_configured" });
+        if (!existingUserForAudit.id && typeof backendProfileClient?.getAppUserProfileByAuthUserId === "function") {
+          const profile = await backendProfileClient.getAppUserProfileByAuthUserId(user.authUserId);
+          if (profile) {
+            existingProfileForAudit = profile;
+            existingUserForAudit = userRecordFromAppUserProfile(profile, {});
+          }
+        }
         const patch = {
           ...extendedAppUserPatchFromUserRecord(user),
           ...(loginResetRequested ? userLoginResetPatch(user) : {})
         };
+        const lastAdmin = await ensureUserPatchDoesNotRemoveLastAdmin(backendProfileClient, existingUserForAudit, user);
+        if (!lastAdmin.ok) return json(res, lastAdmin.error === "last_active_admin_required" ? 409 : 503, { error: lastAdmin.error });
         if (patch.email) await backendProfileClient.updateAuthEmail(user.authUserId, patch.email);
         const profile = await writeAppUserProfileWithSchemaFallback(
           (nextPatch) => backendProfileClient.updateAppUserProfile(user.authUserId, nextPatch),
@@ -458,6 +498,8 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
             ...extendedAppUserPatchFromUserRecord(user),
             ...(loginResetRequested ? userLoginResetPatch(user) : {})
           };
+          const lastAdmin = await ensureUserPatchDoesNotRemoveLastAdmin(backendProfileClient, normalizedExistingProfile, user);
+          if (!lastAdmin.ok) return json(res, lastAdmin.error === "last_active_admin_required" ? 409 : 503, { error: lastAdmin.error });
           const profile = await writeAppUserProfileWithSchemaFallback(
             (nextPatch) => backendProfileClient.updateAppUserProfileById(id, nextPatch),
             patch

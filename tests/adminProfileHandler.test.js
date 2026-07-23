@@ -75,6 +75,8 @@ describe("admin profile handler", () => {
     const profileClient = {
       getAuthUser: vi.fn().mockResolvedValue({ id: "admin-auth-1", email: "owner@example.com" }),
       getAppUserProfile: vi.fn().mockResolvedValue(adminProfile),
+      getAppUserProfileByAuthUserId: vi.fn().mockResolvedValue({ id: "target-1", auth_user_id: "target-auth-1", role: "user", active: true }),
+      hasOtherActiveAdmin: vi.fn(),
       updateAuthEmail: vi.fn(),
       updateAppUserProfile: vi.fn().mockResolvedValue({
         id: "target-1",
@@ -121,6 +123,48 @@ describe("admin profile handler", () => {
     expect(profileClient.updateAuthEmail).not.toHaveBeenCalled();
   });
 
+  it("prevents disabling the last active admin through admin profile sync", async () => {
+    const profileClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "admin-auth-1", email: "owner@example.com" }),
+      getAppUserProfile: vi.fn().mockResolvedValue(adminProfile),
+      getAppUserProfileByAuthUserId: vi.fn().mockResolvedValue(adminProfile),
+      hasOtherActiveAdmin: vi.fn().mockResolvedValue(false),
+      updateAuthEmail: vi.fn(),
+      updateAppUserProfile: vi.fn()
+    };
+    const handler = createAdminProfileHandler({ profileClient });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer admin-token" },
+      body: { authUserId: "admin-auth-1", patch: { active: false } }
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: "last_active_admin_required" });
+    expect(profileClient.updateAppUserProfile).not.toHaveBeenCalled();
+  });
+
+  it("allows disabling an admin when another active admin exists", async () => {
+    const profileClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "admin-auth-2", email: "second@example.com" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({ ...adminProfile, id: "admin-2", auth_user_id: "admin-auth-2", email: "second@example.com" }),
+      getAppUserProfileByAuthUserId: vi.fn().mockResolvedValue(adminProfile),
+      hasOtherActiveAdmin: vi.fn().mockResolvedValue(true),
+      updateAuthEmail: vi.fn(),
+      updateAppUserProfile: vi.fn().mockResolvedValue({ ...adminProfile, active: false })
+    };
+    const handler = createAdminProfileHandler({ profileClient });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer second-admin-token" },
+      body: { authUserId: "admin-auth-1", patch: { active: false } }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(profileClient.hasOtherActiveAdmin).toHaveBeenCalledWith({ authUserId: "admin-auth-1", id: "admin-1" });
+    expect(profileClient.updateAppUserProfile).toHaveBeenCalledWith("admin-auth-1", { active: false });
+  });
+
   it("rejects a non-admin caller", async () => {
     const profileClient = {
       getAuthUser: vi.fn().mockResolvedValue({ id: "user-auth-1", email: "user@example.com" }),
@@ -157,6 +201,8 @@ describe("admin profile handler", () => {
     const profileClient = {
       getAuthUser: vi.fn().mockResolvedValue({ id: "admin-auth-2", email: "second-admin@example.com" }),
       getAppUserProfile: vi.fn().mockResolvedValue(secondAdminProfile),
+      getAppUserProfileByAuthUserId: vi.fn().mockResolvedValue({ id: "target-2", auth_user_id: "target-auth-2", role: "user", active: true }),
+      hasOtherActiveAdmin: vi.fn(),
       updateAuthEmail: vi.fn(),
       updateAppUserProfile: vi.fn().mockResolvedValue({
         id: "target-2",
