@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
-import { REQUIRED_OPERATION_DOCS, stableJson, verifyOperationsDocs } from "../src/docsVerificationModel.js";
+import { REQUIRED_CANONICAL_DOCS, stableJson, verifyOperationsDocs } from "../src/docsVerificationModel.js";
 
 const root = process.cwd();
 const skipDirs = new Set([".git", "node_modules", "dist", "coverage", ".vercel", "vite-cache"]);
@@ -21,7 +21,7 @@ function walk(dir, prefix = "") {
 
 const markdownFiles = walk(root);
 const files = {};
-for (const file of [...new Set([...markdownFiles, ...REQUIRED_OPERATION_DOCS])].sort()) {
+for (const file of [...new Set([...markdownFiles, ...REQUIRED_CANONICAL_DOCS])].sort()) {
   try {
     files[file] = readFileSync(path.join(root, file), "utf8");
   } catch {}

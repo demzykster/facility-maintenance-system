@@ -6,6 +6,11 @@ This document maps current responsibility semantics only. It does not define a
 new workflow engine, event bus, notification policy, role model, or assignment
 policy.
 
+Canonical event ids used below are defined in
+`tools/contracts/eventCatalog.js` and explained in
+[Canonical Event Catalog](canonical-event-catalog.md). The catalog is
+static-only and is not imported by production runtime modules.
+
 ## Source Files
 
 - `src/ticketResponsibilityModel.js`
@@ -91,6 +96,14 @@ waitingReason = no_equipment
 supplier == assignee supplier
 assignee == acting technician
 ```
+
+Related canonical ids:
+
+- `ticket.supplier_routing`
+- `ticket.supplier_technician_acceptance`
+- `ticket.no_equipment_waiting`
+- `ticket.rework`
+- `ticket.admin_close`
 
 ## Known Responsibility Gaps
 

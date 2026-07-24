@@ -5,6 +5,9 @@ Verified from local HEAD `07a88d1` with production/origin baseline `5983f23`.
 This audit compares domain state, history, audit, notifications, push routes,
 and AI relevance. It does not change runtime behavior.
 
+Canonical event ids are defined in `tools/contracts/eventCatalog.js` and
+documented in [Canonical Event Catalog](../architecture/canonical-event-catalog.md).
+
 Status values:
 
 - `INTENTIONAL_ABSENCE`: no notification/event is currently required by known product rules.

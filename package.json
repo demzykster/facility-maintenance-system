@@ -58,6 +58,7 @@
     "platform:verify": "node tools/platform-verify.mjs",
     "authority:verify": "node tools/authority-verify.mjs",
     "docs:verify": "node tools/docs-verify.mjs",
+    "events:verify": "node tools/event-catalog-verify.mjs",
     "staging:data:summary": "node tools/staging-data-summary.mjs",
     "staging:kv:residuals": "node tools/staging-kv-residuals-report.mjs",
     "staging:kv:retire-mirrors": "node tools/staging-kv-retire-mirrors.mjs",

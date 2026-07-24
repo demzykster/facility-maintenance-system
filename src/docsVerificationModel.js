@@ -14,6 +14,7 @@ export const REQUIRED_OPERATION_DOCS = Object.freeze([
 ]);
 
 export const REQUIRED_ARCHITECTURE_INVENTORY_DOCS = Object.freeze([
+  "docs/architecture/canonical-event-catalog.md",
   "docs/architecture/responsibility-inventory.md",
   "docs/architecture/business-event-inventory.md",
   "docs/architecture/notification-delivery-inventory.md",

@@ -6,6 +6,10 @@ This document describes current notification delivery. It does not introduce a
 new notification channel, event bus, scheduler, recipient policy, or push
 behavior.
 
+Canonical event ids are defined in `tools/contracts/eventCatalog.js` and
+documented in [Canonical Event Catalog](canonical-event-catalog.md). They are
+static metadata only.
+
 ## Current Chain
 
 ```text
@@ -90,3 +94,21 @@ The primary event calculation path is `computeEvents()` in
 
 No notification kind, recipient, push payload, service worker behavior, route,
 dedupe key, or preference behavior was changed by this sprint.
+
+## Canonical IDs for Notification-Critical Paths
+
+- `ticket.create`
+- `ticket.no_equipment_waiting`
+- `ticket.rework`
+- `ticket.priority_update`
+- `fleet.pm_due_soon`
+- `fleet.document_warning`
+- `fleet.blocked_unit`
+- `ppe.request_pending`
+- `ppe.low_stock`
+- `ppe.open_order`
+- `cleaning.round_due`
+- `cleaning.round_overdue`
+- `cleaning.complaint_created`
+- `cleaning.complaint_escalation`
+- `ai.assist`

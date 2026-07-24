@@ -5,6 +5,9 @@ Verified from local HEAD `07a88d1` with production/origin baseline `5983f23`.
 This is an inventory of existing event-like surfaces. It is not a new event
 architecture and does not change runtime behavior.
 
+Canonical event ids are defined in `tools/contracts/eventCatalog.js` and
+documented in [Canonical Event Catalog](canonical-event-catalog.md).
+
 ## Event Surfaces
 
 | Surface | Producer | Persistence | Main consumers | Notes |
@@ -56,6 +59,40 @@ architecture and does not change runtime behavior.
 | Tech rework notifications depend partly on history text. | Tech branch searches log entries for return wording. | Duplicated/legacy path. | Keep as known compatibility behavior until event catalog exists. |
 | Public cleaning complaint audit parity is not proven. | Public complaint handler validation/write path found; explicit audit event not confirmed. | Unknown/current gap. | Owner-approved audit review of public flow. |
 | AI assist has audit telemetry but not event/notification mapping. | AI handler writes AI assist audit; AI proposal path is not a notification producer. | Intentional absence. | Document as AI relevance only, not notification channel. |
+
+## Canonical IDs Referenced by This Inventory
+
+- `ticket.create`
+- `ticket.supplier_routing`
+- `ticket.supplier_technician_acceptance`
+- `ticket.no_equipment_waiting`
+- `ticket.repair_complete`
+- `ticket.manager_approval`
+- `ticket.rework`
+- `ticket.admin_close`
+- `ticket.priority_update`
+- `ticket.downtime_update`
+- `work.task_create`
+- `work.task_update`
+- `work.meeting_create`
+- `work.meeting_update`
+- `fleet.pm_due_soon`
+- `fleet.document_warning`
+- `fleet.blocked_unit`
+- `fleet.driver_request`
+- `fleet.driver_request_outcome`
+- `ppe.request_pending`
+- `ppe.low_stock`
+- `ppe.open_order`
+- `cleaning.round_due`
+- `cleaning.round_overdue`
+- `cleaning.complaint_created`
+- `cleaning.complaint_escalation`
+- `identity.first_install_completed`
+- `identity.admin_recovery_bootstrap`
+- `identity.last_admin_mutation_blocked`
+- `ai.assist`
+- `ai.confirmed_ticket_create`
 
 ## Non-Changes
 
