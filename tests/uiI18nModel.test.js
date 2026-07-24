@@ -48,11 +48,44 @@ describe("uiI18nModel", () => {
     expect(uiTextOptions()).toContain("rolePreview.title");
     expect(uiTextOptions()).toContain("ppe.noneIssued");
     expect(uiTextOptions()).toContain("audit.noMatches");
+    expect(uiTextOptions()).toContain("notification.kind.waiting");
   });
 
   it("localizes the cleaning QR gate for Russian cleaner flows", () => {
     expect(uiText("ru", "cleaningQr.title")).toBe("Нужно отсканировать QR в зоне");
     expect(uiText("ru", "cleaningQr.forZone", { zone: "Склад" })).toContain("Склад");
     expect(uiText("ru", "cleaningQr.remoteBlocked")).toContain("удалённо");
+  });
+
+  it("localizes notification kind labels for every supported language", () => {
+    const languages = languageOptions().map((language) => language.code);
+    const notificationKindKeys = uiTextOptions().filter((key) => key.startsWith("notification.kind."));
+
+    expect(notificationKindKeys).toContain("notification.kind.waiting");
+    expect(notificationKindKeys.length).toBeGreaterThanOrEqual(14);
+
+    for (const language of languages) {
+      for (const key of notificationKindKeys) {
+        expect(uiText(language, key)).not.toBe(key);
+      }
+    }
+  });
+
+  it("describes public cleaning reports as unauthenticated, not confidential", () => {
+    const forbiddenTermsByLanguage = {
+      he: [/אנונימי/, /פרטי/, /חסוי/],
+      en: [/anonymous/i, /private/i, /confidential/i, /incognito/i],
+      ru: [/аноним/i, /конфиденц/i, /инкогнито/i],
+      ar: [/مجهول/, /خاص/, /سري/],
+      hi: [/गुमनाम/, /निजी/, /गोपनीय/],
+      ti: [/ስም ዘይብሉ/, /ምስጢራዊ/],
+    };
+
+    for (const language of languageOptions().map((option) => option.code)) {
+      const publicText = `${uiText(language, "public.submit")} ${uiText(language, "public.approvalFoot")}`;
+      for (const term of forbiddenTermsByLanguage[language]) {
+        expect(publicText).not.toMatch(term);
+      }
+    }
   });
 });
