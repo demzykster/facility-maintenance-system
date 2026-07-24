@@ -13,7 +13,26 @@ export const REQUIRED_OPERATION_DOCS = Object.freeze([
   "docs/operations/checklists/quarterly-readiness.md"
 ]);
 
-const CANONICAL_DOC_PREFIXES = Object.freeze(["README.md", "docs/current-state.md", "docs/operations/"]);
+export const REQUIRED_ARCHITECTURE_INVENTORY_DOCS = Object.freeze([
+  "docs/architecture/responsibility-inventory.md",
+  "docs/architecture/business-event-inventory.md",
+  "docs/architecture/notification-delivery-inventory.md",
+  "docs/audits/event-notification-synchronization-gap-matrix.md"
+]);
+
+export const REQUIRED_CANONICAL_DOCS = Object.freeze([
+  ...REQUIRED_OPERATION_DOCS,
+  ...REQUIRED_ARCHITECTURE_INVENTORY_DOCS
+]);
+
+const CANONICAL_DOC_PREFIXES = Object.freeze([
+  "README.md",
+  "docs/current-state.md",
+  "docs/operations/"
+]);
+const CANONICAL_DOC_PATHS = Object.freeze([
+  ...REQUIRED_ARCHITECTURE_INVENTORY_DOCS
+]);
 const EXPECTED_PRODUCTION_DOMAIN = "https://facility-maintenance-system.vercel.app";
 const HISTORICAL_DOCS = Object.freeze([
   "docs/active-work.md",
@@ -34,7 +53,7 @@ const UNSUPPORTED_COMMANDS = Object.freeze([
 
 export function verifyOperationsDocs({
   files = {},
-  required = REQUIRED_OPERATION_DOCS,
+  required = REQUIRED_CANONICAL_DOCS,
   productionDomain = EXPECTED_PRODUCTION_DOMAIN
 } = {}) {
   const errors = [];
@@ -108,7 +127,7 @@ export function stableJson(value) {
 
 export function isCanonicalOperationalFile(file = "") {
   const path = normalizePath(file);
-  return CANONICAL_DOC_PREFIXES.some((prefix) => path === prefix || path.startsWith(prefix));
+  return CANONICAL_DOC_PATHS.includes(path) || CANONICAL_DOC_PREFIXES.some((prefix) => path === prefix || path.startsWith(prefix));
 }
 
 export function extractMarkdownLinks(file = "", text = "") {
