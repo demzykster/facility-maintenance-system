@@ -135,6 +135,192 @@ describe("public complaint handler", () => {
     expect(complaint.photo).toBe(photo);
   });
 
+  it("writes a sanitized audit event after a successful public complaint create", async () => {
+    const driver = {
+      get: vi.fn(async (key) => {
+        if (key.startsWith("publicComplaintRate:")) return null;
+        if (key === "czone:zone-1") return JSON.stringify({
+          id: "zone-1",
+          name: "Server Lobby",
+          building: "A",
+          floor: "1",
+          active: true
+        });
+        return null;
+      }),
+      set: vi.fn()
+    };
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const handler = createPublicComplaintHandler({
+      driver,
+      auditDriver,
+      env: {
+        CMMS_PUBLIC_COMPLAINTS_ENABLED: "true",
+        SUPABASE_SERVICE_ROLE_KEY: "service-role-secret"
+      },
+      now: () => 123456,
+      createId: () => "complaint-1"
+    });
+
+    const res = await call(handler, {
+      headers: {
+        authorization: "Bearer public-token",
+        apikey: "client-api-key",
+        "x-forwarded-for": "203.0.113.10",
+        "user-agent": "browser"
+      },
+      body: {
+        zoneId: "zone-1",
+        zoneName: "Client Injected Zone",
+        status: "closed",
+        ownerRole: "admin",
+        reportedByRole: "admin",
+        kind: "dirty",
+        text: "  Spill near entrance  ",
+        photo
+      }
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(auditDriver.write).toHaveBeenCalledTimes(1);
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: "",
+      actorRole: "public",
+      entityType: "cleaning",
+      entityId: "complaint-1",
+      action: "create",
+      after: expect.objectContaining({
+        complaintId: "complaint-1",
+        zoneId: "zone-1",
+        zoneName: "Server Lobby",
+        zoneLoc: "A · 1",
+        kind: "dirty",
+        details: "Spill near entrance",
+        status: "pending",
+        source: "public_endpoint",
+        attachment: expect.objectContaining({ hasPhoto: true })
+      }),
+      metadata: expect.objectContaining({
+        source: "public_endpoint",
+        actorType: "unauthenticated/public"
+      })
+    }));
+    const payload = JSON.stringify(auditDriver.write.mock.calls[0][0]);
+    expect(payload).not.toContain("Client Injected Zone");
+    expect(payload).not.toContain("closed");
+    expect(payload).not.toContain("data:image");
+    expect(payload).not.toContain("public-token");
+    expect(payload).not.toContain("client-api-key");
+    expect(payload).not.toContain("service-role-secret");
+    expect(payload).not.toContain("203.0.113.10");
+    expect(payload).not.toContain("browser");
+  });
+
+  it("records stored photo metadata in audit without base64 content", async () => {
+    const driver = {
+      get: vi.fn(async (key) => {
+        if (key.startsWith("publicComplaintRate:")) return null;
+        if (key === "czone:zone-1") return JSON.stringify({ id: "zone-1", name: "Lobby" });
+        return null;
+      }),
+      set: vi.fn()
+    };
+    const fileDriver = { upload: vi.fn().mockResolvedValue({ path: "cleaning/complaints/complaint-1/photo.jpg" }) };
+    const metadataDriver = { upsert: vi.fn().mockResolvedValue({ ok: true }) };
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const handler = createPublicComplaintHandler({
+      driver,
+      fileDriver,
+      metadataDriver,
+      auditDriver,
+      env: { CMMS_PUBLIC_COMPLAINTS_ENABLED: "true", CMMS_FILE_DRIVER: "supabase", CMMS_FILE_METADATA_DRIVER: "supabase" },
+      now: () => 123456,
+      createId: () => "complaint-1"
+    });
+
+    const res = await call(handler, {
+      body: { zoneId: "zone-1", kind: "dirty", text: "Spill", photo }
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      after: expect.objectContaining({
+        attachment: {
+          hasPhoto: true,
+          photoPath: "cleaning/complaints/complaint-1/photo.jpg"
+        }
+      })
+    }));
+    expect(JSON.stringify(auditDriver.write.mock.calls[0][0])).not.toContain("data:image");
+  });
+
+  it("keeps the public complaint response successful when audit persistence fails", async () => {
+    const driver = {
+      get: vi.fn(async (key) => {
+        if (key.startsWith("publicComplaintRate:")) return null;
+        if (key === "czone:zone-1") return JSON.stringify({ id: "zone-1", name: "Lobby" });
+        return null;
+      }),
+      set: vi.fn()
+    };
+    const complaintsDriver = { upsert: vi.fn().mockResolvedValue({ id: "complaint-1" }) };
+    const auditDriver = { write: vi.fn().mockRejectedValue(new Error("audit storage failed with token secret")) };
+    const logger = vi.fn();
+    const handler = createPublicComplaintHandler({
+      driver,
+      complaintsDriver,
+      auditDriver,
+      logger,
+      env: { CMMS_PUBLIC_COMPLAINTS_ENABLED: "true" },
+      now: () => 123456,
+      createId: () => "complaint-1"
+    });
+
+    const res = await call(handler, {
+      body: { zoneId: "zone-1", kind: "dirty", text: "Spill", photo }
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toEqual({ ok: true, id: "complaint-1", status: "pending" });
+    expect(complaintsDriver.upsert).toHaveBeenCalledTimes(1);
+    expect(auditDriver.write).toHaveBeenCalledTimes(1);
+    expect(logger).toHaveBeenCalledTimes(1);
+    const diagnostic = String(logger.mock.calls[0][0]);
+    expect(diagnostic).toContain("public_complaint_audit_error");
+    expect(diagnostic).toContain("complaint-1");
+    expect(diagnostic).not.toContain("token secret");
+    expect(diagnostic).not.toContain("Spill");
+  });
+
+  it("does not write business audit events for disabled, invalid, or rate-limited requests", async () => {
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const disabled = createPublicComplaintHandler({
+      driver: { get: vi.fn(), set: vi.fn() },
+      auditDriver,
+      env: {}
+    });
+    const invalid = createPublicComplaintHandler({
+      driver: { get: vi.fn(), set: vi.fn() },
+      auditDriver,
+      env: { CMMS_PUBLIC_COMPLAINTS_ENABLED: "true" }
+    });
+    const rateLimited = createPublicComplaintHandler({
+      driver: {
+        get: vi.fn(async (key) => key.startsWith("publicComplaintRate:") ? "123000" : null),
+        set: vi.fn()
+      },
+      auditDriver,
+      env: { CMMS_PUBLIC_COMPLAINTS_ENABLED: "true" },
+      now: () => 123456
+    });
+
+    await call(disabled, { body: { zoneId: "zone-1", kind: "dirty", photo } });
+    await call(invalid, { body: { zoneId: "zone-1", kind: "round", photo } });
+    await call(rateLimited, { body: { zoneId: "zone-1", kind: "dirty", photo } });
+
+    expect(auditDriver.write).not.toHaveBeenCalled();
+  });
+
   it("writes public complaints to the normalized complaints driver without creating a KV mirror when configured", async () => {
     const driver = {
       get: vi.fn(async (key) => {

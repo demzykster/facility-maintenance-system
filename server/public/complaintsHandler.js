@@ -6,6 +6,8 @@ import { sendServerError } from "../httpErrors.js";
 import { cleaningComplaintPhotoMetadata } from "../../src/fileMetadataModel.js";
 import { createSupabaseCleaningComplaintsDriverFromEnv } from "../cleaning/supabaseCleaningRecordsDriver.js";
 import { createSupabaseCleaningZonesDriverFromEnv } from "../cleaning/supabaseCleaningZonesDriver.js";
+import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
+import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, normalizeAuditEvent } from "../../src/auditEventModel.js";
 
 const MAX_BODY_BYTES = 2_200_000;
 const MAX_PHOTO_CHARS = 2_000_000;
@@ -65,6 +67,57 @@ const photoFileFromDataUrl = (value = "") => {
 const safePathSegment = (value) => String(value || "item").replace(/[^a-zA-Z0-9._-]/g, "-");
 
 const publicComplaintPhotoPath = (complaintId, file) => `cleaning/complaints/${safePathSegment(complaintId)}/photo.${file.ext}`;
+
+const writeAuditEvent = async (auditDriver, event) => {
+  if (!auditDriver || !event) return;
+  if (typeof auditDriver.write === "function") return auditDriver.write(event);
+};
+
+const publicComplaintCreateAuditEvent = (complaint = {}) => normalizeAuditEvent({
+  at: complaint.at,
+  actorId: "",
+  actorName: "דיווח ציבורי",
+  actorRole: "public",
+  entityType: AUDIT_ENTITY_TYPES.cleaning,
+  entityId: complaint.id,
+  action: AUDIT_ACTIONS.create,
+  summary: `Public cleaning complaint created: ${complaint.id || "unknown"}`,
+  after: {
+    complaintId: complaint.id || "",
+    zoneId: complaint.zoneId || "",
+    zoneName: complaint.zoneName || "",
+    zoneLoc: complaint.zoneLoc || "",
+    kind: complaint.kind || "",
+    details: complaint.text || "",
+    status: complaint.status || "pending",
+    source: complaint.source || "public_endpoint",
+    createdAt: complaint.at || null,
+    attachment: {
+      hasPhoto: complaint.hasPhoto === true || Boolean(complaint.photoPath || complaint.photo),
+      photoPath: complaint.photoPath || ""
+    }
+  },
+  metadata: {
+    source: "public_endpoint",
+    actorType: "unauthenticated/public",
+    publicSubmission: true
+  }
+});
+
+const logAuditFailure = (logger, complaint = {}, error) => {
+  const log = typeof logger === "function" ? logger : console.error;
+  log(JSON.stringify({
+    level: "error",
+    source: "cmms-api",
+    route: "/api/public/complaints",
+    method: "POST",
+    code: "public_complaint_audit_error",
+    complaintId: complaint.id || "",
+    entityType: AUDIT_ENTITY_TYPES.cleaning,
+    action: AUDIT_ACTIONS.create,
+    name: String(error?.name || "Error").slice(0, 80)
+  }));
+};
 
 const requestFingerprint = (req) => {
   const forwarded = String(getHeader(req.headers, "x-forwarded-for") || "").split(",")[0].trim();
@@ -141,10 +194,12 @@ export function createPublicComplaintHandler({
   zonesDriver = null,
   fileDriver = null,
   metadataDriver = null,
+  auditDriver = null,
   env = process.env,
   now = () => Date.now(),
   createId = () => randomUUID(),
-  fetchImpl = globalThis.fetch
+  fetchImpl = globalThis.fetch,
+  logger = console.error
 } = {}) {
   const backendDriver = driver
     || (env.CMMS_PUBLIC_COMPLAINTS_DRIVER === "supabase" || env.CMMS_KV_DRIVER === "supabase"
@@ -163,6 +218,8 @@ export function createPublicComplaintHandler({
     || (requireFileStorage ? createSupabaseFileDriverFromEnv(env, fetchImpl) : null);
   const backendMetadataDriver = metadataDriver
     || (env.CMMS_FILE_METADATA_DRIVER === "supabase" ? createSupabaseFileMetadataDriverFromEnv(env, fetchImpl) : null);
+  const backendAuditDriver = auditDriver
+    || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
 
   return async function publicComplaintHandler(req, res) {
     const method = String(req.method || "GET").toUpperCase();
@@ -230,6 +287,11 @@ export function createPublicComplaintHandler({
       if (backendComplaintsDriver) await backendComplaintsDriver.upsert(complaint);
       await backendDriver.set(rateKey, String(currentTime), false);
       if (!backendComplaintsDriver) await backendDriver.set(`ccomplaint:${complaint.id}`, JSON.stringify(complaint), true);
+      try {
+        await writeAuditEvent(backendAuditDriver, publicComplaintCreateAuditEvent(complaint));
+      } catch (auditError) {
+        logAuditFailure(logger, complaint, auditError);
+      }
       return json(res, 201, { ok: true, id: complaint.id, status: complaint.status });
     } catch (error) {
       if (error?.message === "payload_too_large") return json(res, 413, { error: "payload_too_large" });
