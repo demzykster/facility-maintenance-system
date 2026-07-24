@@ -21,4 +21,11 @@ describe("startup data-load wiring", () => {
     expect(source).toMatch(/normalizedLoads\.push\(\(async \(\) => \{[\s\S]*ppeForAuthority/);
     expect(source).toMatch(/await Promise\.all\(normalizedLoads\);[\s\S]*const apply =/);
   });
+
+  it("keeps the production first-run startup flow behind a local cancellation guard", () => {
+    expect(source).toMatch(/useEffect\(\(\) => \{\s*let cancelled = false;[\s\S]*fetchFirstRunInstallState/);
+    expect(source).toMatch(/fetchFirstRunInstallState[\s\S]*if \(!cancelled\) \{[\s\S]*setFirstRunInstallState\(installState\)/);
+    expect(source).toMatch(/restoreProductionSession[\s\S]*if \(cancelled\) return;[\s\S]*setSession\(restored\.session\)/);
+    expect(source).toMatch(/finally \{ if \(!cancelled\) setReady\(true\); \}[\s\S]*return \(\) => \{ cancelled = true; \};/);
+  });
 });

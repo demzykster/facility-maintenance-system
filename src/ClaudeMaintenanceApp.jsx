@@ -1808,7 +1808,7 @@ export default function App() {
     } catch {}
   };
 
-  useEffect(() => { (async () => {
+  useEffect(() => { let cancelled = false; (async () => {
     try {
     const th = await store.get("theme:v1", false); if (th) setTheme(th);
     const savedLanguage = await store.get("language:v1", false);
@@ -1825,7 +1825,7 @@ export default function App() {
     }
     if (SEED_POLICY.requiresServerBootstrapAdmin) {
       fetchPublicZones({ url: PUBLIC_ZONES_URL })
-        .then((publicZones) => { if (publicZones.length > 0) setZones(publicZones); })
+        .then((publicZones) => { if (!cancelled && publicZones.length > 0) setZones(publicZones); })
         .catch(() => {});
       try {
         const installState = await fetchFirstRunInstallState({ config: PRODUCTION_LOGIN_CONFIG });
@@ -1838,7 +1838,7 @@ export default function App() {
       } catch {
         if (!cancelled) setFirstRunInstallState({ ok: false, state: "unknown", reason: "install_state_failed" });
       }
-      const restored = await restoreProductionSession({ config: PRODUCTION_LOGIN_CONFIG, authStore: PRODUCTION_AUTH_STORE });
+      const restored = await restoreProductionSession({ config: PRODUCTION_LOGIN_CONFIG, authStore: PRODUCTION_AUTH_STORE }); if (cancelled) return;
       if (restored?.session) {
 	        setSession(restored.session);
 	        applySavedConfig(await store.get("config:v1", true));
@@ -1878,8 +1878,8 @@ export default function App() {
     const s = await store.get("session:v1", false); if (s) try { const ss = JSON.parse(s); if (us.find((u) => u.id === ss.id && u.active)) setSession(ss); } catch {}
     await reloadAll();
     } catch (e) { console.error("init error", e); }
-    finally { setReady(true); }
-  })(); }, []);
+    finally { if (!cancelled) setReady(true); }
+  })(); return () => { cancelled = true; }; }, []);
   useEffect(() => {
     if (!session) return;
     const refresh = ({ force = false } = {}) => {
