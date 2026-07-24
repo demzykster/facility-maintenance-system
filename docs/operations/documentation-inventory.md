@@ -1,6 +1,6 @@
 # Operational Documentation Inventory
 
-Last verified against local commit: `5983f23` with production/origin baseline `5983f23`.
+Last verified during Night Mode Sprint #2 from local baseline `07a88d1` with production/origin baseline `5983f23`.
 
 Status meanings:
 
@@ -17,6 +17,10 @@ Status meanings:
 | `README.md` | `CURRENT_WITH_GAPS` | Good repo entry; should point future operators to `docs/operations/README.md`. |
 | `AGENTS.md` | `CURRENT` | Repo-local harness and source order. |
 | `docs/current-state.md` | `CURRENT` | Updated during R12 to current baseline and operations entry points. |
+| `docs/architecture/responsibility-inventory.md` | `CURRENT` | Responsibility, ownership, queue, approval, visibility, and authority inventory. |
+| `docs/architecture/business-event-inventory.md` | `CURRENT_WITH_GAPS` | Existing history/audit/notification/AI event-like surfaces; known gaps are explicit. |
+| `docs/architecture/notification-delivery-inventory.md` | `CURRENT_WITH_GAPS` | Current snapshot notification, access, push, and routing inventory. |
+| `docs/audits/event-notification-synchronization-gap-matrix.md` | `CURRENT_WITH_GAPS` | Cross-surface matrix and safest next implementation-slice proposal. |
 | `docs/operations/README.md` | `CURRENT` | Canonical operations entry point. |
 | `docs/operations/runbook-index.md` | `CURRENT` | Canonical runbook map. |
 | `docs/operations/production-change-policy.md` | `CURRENT` | Canonical production change policy. |
