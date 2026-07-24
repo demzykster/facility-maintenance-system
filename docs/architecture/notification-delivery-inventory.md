@@ -30,12 +30,12 @@ The primary event calculation path is `computeEvents()` in
 | Component | Source | Filtering | Recipient resolution | Delivery semantics | Dedupe/read state | Click destination | Tests/gaps |
 |---|---|---|---|---|---|---|---|
 | In-app notification panel | `computeEvents()` snapshot events plus waiting-return helper. | Session role, visibility helpers, notification access rules, local hide/read prefs. | Derived from current session and visible records; not a durable recipient list. | Panel shows current computed events. | Local storage read/hide/sort state in `notificationPrefsModel.js`. | Ticket detail, tasks, PPE, cleaning, PM/fleet, BI fallback. | Unknown kinds need safe routing/prefs behavior. |
-| Global kind toggles | `src/notificationModel.js`. | Per-kind config generated from `NOTIFICATION_KIND_IDS`. | User preference layer, not business authority. | Controls visible/allowed notification kinds. | Local preference keys. | Not applicable. | Does not include `waiting`, while waiting helper emits it. |
+| Global kind toggles | `src/notificationModel.js`. | Per-kind config generated from `NOTIFICATION_KIND_IDS`. | User preference layer, not business authority. | Controls visible/allowed notification kinds. | Local preference keys. | Not applicable. | Includes `waiting` as a panel-only kind. |
 | Notification access rules | `src/notificationAccessModel.js`. | Role, permissions, visibility, cleaning access. | `notificationAllowedByAccess()` and related helpers. | Determines whether a user may see/use a notification kind in context. | None. | Not applicable. | Includes `system`; does not by itself prove event production. |
 | Browser notification bridge | `notificationPrefsModel.js` and shell browser notification state. | User prefs plus non-interrupting kind/key policy. | Current browser session only. | Browser/OS notification may be suppressed for panel-only events. | Per-event browser state and throttling. | Same event route contract. | `doc`, `pm`, `ppe`, and shift on/off prefixes are panel-only. |
-| Server push model | `src/pushNotificationModel.js`. | Subscription eligibility, preferences, access checks. | Push subscriptions by user/session plus notification access. | Sanitized payload sent to browser push subscription. | Uses payload/request identity; delivery retry is push-provider/browser dependent. | Service worker opens provided route. | Unknown push kind normalizes to `system`; `waiting` is not a modeled push kind. |
+| Server push model | `src/pushNotificationModel.js`. | Subscription eligibility, preferences, access checks. | Push subscriptions by user/session plus notification access. | Sanitized payload sent to browser push subscription. | Uses payload/request identity; delivery retry is push-provider/browser dependent. | Service worker opens provided route. | Unknown push kind normalizes to `system`; `waiting` is explicitly skipped as non-interrupting/panel-only. |
 | Service worker click routing | Service worker and payload route data. | Browser permission and existing route. | User click, not server routing. | Opens/focuses application route. | Browser notification lifecycle. | Ticket/detail or view route. | Route inventory is implicit in event payload contracts. |
-| Waiting-return indicator | `src/waitingReturnReminderModel.js`. | Visible waiting tickets and next responsible party match. | Current internal responsible user/role if unambiguous. | In-app attention indicator; no automatic status change. | Event key includes ticket id and waitingUntil. | Ticket detail. | Emits `kind = "waiting"` outside global notification kind list. |
+| Waiting-return indicator | `src/waitingReturnReminderModel.js`. | Visible waiting tickets and next responsible party match. | Current internal responsible user/role if unambiguous. | In-app attention indicator; no automatic status change. | Event key includes ticket id and waitingUntil. | Ticket detail. | Emits registered panel-only kind `waiting`. |
 
 ## Notification Kinds
 
@@ -55,7 +55,7 @@ The primary event calculation path is `computeEvents()` in
 | `ppe` | PPE requests, orders, low stock, approvals. | Browser push is intentionally non-interrupting/panel-only. |
 | `cleaning` | Cleaning rounds, complaints, zone cleaned state. | Access filtered by cleaning visibility/scope. |
 | `system` | Access/push fallback kind. | Present in access/push models, not in global kind list. |
-| `waiting` | Waiting-return attention helper. | Produced by waiting helper but absent from global kind and push kind lists. |
+| `waiting` | Waiting-return attention helper. | Registered for in-app panel only; excluded from browser/OS and server push delivery. |
 
 ## Route Contracts
 
@@ -85,10 +85,10 @@ The primary event calculation path is `computeEvents()` in
 
 | Gap | Evidence | Classification | Safe next action |
 |---|---|---|---|
-| Waiting-return kind not in global kind catalog. | `waitingReturnReminderModel.js` vs `notificationModel.js`/`pushNotificationModel.js`. | Current gap. | Static inventory guardrail and owner-approved catalog decision. |
+| Waiting-return kind must stay panel-only. | `waitingReturnReminderModel.js`, `notificationModel.js`, `notificationPrefsModel.js`, and `pushNotificationModel.js`. | Owner-approved policy. | Tests must keep it out of browser/OS and server push delivery. |
 | Notification routes are implicit. | Route values are spread through computed events and panel handling. | Documentation gap. | Static route inventory check before runtime changes. |
 | Snapshot notifications can duplicate or diverge from audit/history. | `computeEvents()` computes from current state and log text. | Architecture debt. | Canonical event catalog documentation first. |
-| Push is narrower than panel. | Non-interrupting kinds and preferences suppress browser push. | Intentional with gaps. | Keep explicit in runbooks/tests. |
+| Push is narrower than panel. | Non-interrupting kinds, panel-only kinds, and preferences suppress browser push. | Intentional policy. | Keep explicit in runbooks/tests. |
 
 ## Non-Changes
 

@@ -14,6 +14,7 @@ export const NOTIFICATION_ACCESS_RULES = Object.freeze({
   driver: { module: "fleet", level: "manage" },
   ppe: { module: "ppe", level: "request" },
   cleaning: { module: "cleaning", level: "view" },
+  waiting: { module: "fleetTickets", level: "view" },
   back: { module: "fleetTickets", level: "view" },
   system: { module: null, level: "view" }
 });
@@ -31,6 +32,7 @@ export const NOTIFICATION_ACCESS_GROUPS = Object.freeze([
   { kind: "driver", label: "נהגים ושיבוצים", module: "fleet" },
   { kind: "ppe", label: "ביגוד עובדים", module: "ppe" },
   { kind: "cleaning", label: "ניקיון וסבבים", module: "cleaning" },
+  { kind: "waiting", label: "חזרה לטיפול", module: "fleetTickets" },
   { kind: "back", label: "סיום משמרת / החזרות", module: "fleetTickets" },
   { kind: "system", label: "מערכת", module: null }
 ]);
@@ -65,7 +67,7 @@ export function notificationAllowedByAccess(user = {}, kind = "system") {
   const role = user?.role || user?.userRole || "";
   if (role === "admin") return true;
   if (kind === "cleaning" && canReceiveCleaningComplaints(user)) return true;
-  if (["new", "upd", "ready", "confirm", "escalate", "back"].includes(kind) && ["user", "tech"].includes(role)) return true;
+  if (["new", "upd", "ready", "confirm", "escalate", "waiting", "back"].includes(kind) && ["user", "tech"].includes(role)) return true;
   if (["pm", "doc"].includes(kind) && ["user", "tech"].includes(role)) return true;
   if (kind === "driver" && role === "user") return true;
   if (kind === "task" || kind === "system") return true;

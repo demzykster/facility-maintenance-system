@@ -88,28 +88,33 @@ owner-approved goal.
 | Identity / Installation | `identity.first_install_completed`, `identity.install_failure_cleanup`, `identity.admin_recovery_bootstrap`, `identity.last_admin_mutation_blocked` |
 | AI | `ai.assist`, `ai.confirmed_ticket_create`, `ai.confirmed_ticket_update`, `ai.confirmed_ticket_comment`, `ai.confirmed_task_create_update`, `ai.confirmed_meeting_create_update` |
 
-## Known Gap: Waiting Kind
+## Panel-Only Kind: Waiting
 
-`ticket.no_equipment_waiting` is currently classified as `known_gap`.
+`ticket.no_equipment_waiting` is currently classified as `complete`, with
+`waiting` registered as a panel-only notification kind.
 
 Evidence:
 
 - `waitingReturnReminderModel.js` emits notification kind `waiting`.
-- `notificationModel.js` does not list `waiting` in `NOTIFICATION_KIND_IDS`.
-- `pushNotificationModel.js` does not list `waiting` in `PUSH_EVENT_KINDS`.
+- `notificationModel.js` lists `waiting` in `NOTIFICATION_KIND_IDS`.
+- `NotificationPanel.jsx` exposes it in the in-app panel filter list.
+- `notificationPrefsModel.js` excludes it from browser/OS notifications.
+- `pushNotificationModel.js` treats it as panel-only and skips server push.
 - Waiting-return behavior is an in-app attention indicator and does not perform
   background push delivery or status automation.
 
 This sprint does not change that behavior.
 
-## Owner Decision Options for Waiting
+## Owner Decision Recorded for Waiting
 
-| Option | Pros | Risks | Affected consumers | Migration/test needs |
-|---|---|---|---|---|
-| Keep `waiting` internal/panel-only. | Smallest behavior surface; preserves current indicator semantics. | Catalog/settings/push remain asymmetric unless explicitly documented. | Waiting return helper, notification panel docs. | Static guardrail must keep `waiting` marked as known gap or internal-only. |
-| Register `waiting` as a full notification kind. | Preferences, docs, and kind catalogs become symmetric. | Could change user-visible settings/push eligibility if not designed carefully. | Notification settings, access rules, push model, browser prefs, tests. | Owner-approved runtime goal with notification/push regression tests. |
-| Map waiting-return to an existing kind. | Avoids adding a kind. | May hide a distinct business meaning under `escalate` or `upd`. | Waiting helper, notification panel, push payload semantics. | Compatibility tests for existing unread/dedupe keys and user expectations. |
-| Remove `waiting` later as a legacy alias. | Simplifies catalog after migration. | Breaks any stored local read/browser state using old keys if done abruptly. | Local notification prefs/browser dedupe state. | Compatibility window and explicit migration plan. |
+The owner decision for the current implementation is:
+
+- `waiting` is a separate canonical notification kind;
+- it is in-app panel only;
+- it is not browser/OS push;
+- it is not interrupting;
+- it is not escalation;
+- it does not change lifecycle, recipients, timing, dedupe, or click route.
 
 ## Verification
 

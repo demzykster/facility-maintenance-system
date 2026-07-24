@@ -106,7 +106,8 @@ export function notificationDisplayEvents(events = [], unreadKeys = new Set(), p
   return events.filter((event) => keys.has(event?.key));
 }
 
-const NON_INTERRUPTING_BROWSER_KINDS = new Set(["doc", "pm", "ppe"]);
+const PANEL_ONLY_BROWSER_KINDS = new Set(["waiting"]);
+const NON_INTERRUPTING_BROWSER_KINDS = new Set(["doc", "pm", "ppe", ...PANEL_ONLY_BROWSER_KINDS]);
 const NON_INTERRUPTING_BROWSER_KEY_PREFIXES = ["sh-on-", "sh-off-"];
 
 export function browserNotificationEvents(events = []) {

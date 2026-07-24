@@ -349,6 +349,40 @@ describe("push API handler", () => {
     expect(push.sendNotification).not.toHaveBeenCalled();
   });
 
+  it("drops waiting return reminders from server push delivery", async () => {
+    const push = {
+      setVapidDetails: vi.fn(),
+      sendNotification: vi.fn().mockResolvedValue(undefined)
+    };
+    const handler = createPushHandler({
+      subscriptionStore: {
+        list: vi.fn().mockResolvedValue([{ id: "push-1", userId: "app-user-1", userRole: "admin", subscription }])
+      },
+      push,
+      env,
+      sessionClient: activeSessionClient
+    });
+
+    const notify = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: {
+        action: "notify",
+        event: {
+          targetUserIds: ["app-user-1"],
+          title: "חזרה לטיפול",
+          body: "מועד ההמתנה הגיע",
+          kind: "waiting",
+          dedupeKey: "wait-return-ticket-1-1000"
+        }
+      }
+    });
+
+    expect(notify.statusCode).toBe(200);
+    expect(notify.json()).toEqual({ ok: true, sent: 0, targets: 0, skipped: "non_interrupting" });
+    expect(push.sendNotification).not.toHaveBeenCalled();
+  });
+
   it("uses fresh user notification preferences before sending business push", async () => {
     let stored = "";
     const driver = {

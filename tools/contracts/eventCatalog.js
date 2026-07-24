@@ -32,9 +32,7 @@ export const EVENT_CATALOG_AI_RELEVANCE = Object.freeze([
   "unknown"
 ]);
 
-export const EVENT_CATALOG_KNOWN_GAP_NOTIFICATION_KINDS = Object.freeze([
-  "waiting"
-]);
+export const EVENT_CATALOG_KNOWN_GAP_NOTIFICATION_KINDS = Object.freeze([]);
 
 export const EVENT_CATALOG_SUPPORTED_ROUTES = Object.freeze([
   "ticket_detail",
@@ -111,11 +109,11 @@ export const CANONICAL_EVENT_CATALOG = Object.freeze([
     auditIdentifiers: ["ticket:status_change", "ticket:update"],
     notificationKinds: ["escalate", "waiting"],
     routes: [{ name: "ticket_detail", status: "supported" }],
-    pushPolicy: "known_gap",
+    pushPolicy: "panel_only",
     aiRelevance: "none",
     coverage: ["tests/ticketLifecycleAuthority.test.js", "tests/waitingReturnReminderModel.test.js"],
-    status: "known_gap",
-    notes: "`waiting` is produced by the waiting-return helper but is not in the global notification or push kind catalogs."
+    status: "complete",
+    notes: "`waiting` is a registered in-app panel-only kind. It is not eligible for browser or server push."
   },
   {
     id: "ticket.work_start",

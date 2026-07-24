@@ -110,7 +110,7 @@ Related canonical ids:
 | Gap | Evidence | Risk | Safe next step |
 |---|---|---|---|
 | Durable event identity is not consistent across history, audit, notifications, and AI. | Notifications are computed from snapshots in `computeEvents()`, while audit/history are written by domain handlers. | Same business operation can have different names or no shared identifier. | Add a documentation/static canonical event catalog before runtime changes. |
-| Waiting-return attention uses `kind = "waiting"` outside the global notification kind model. | `waitingReturnReminderModel.js` emits `waiting`; `notificationModel.js` and push kind set do not include it. | Settings/push/prefs may not describe the kind consistently. | Classify in event/notification matrix; do not change runtime until owner approves event catalog. |
+| Waiting-return attention uses `kind = "waiting"` as a panel-only notification kind. | `waitingReturnReminderModel.js` emits `waiting`; `notificationModel.js` registers it; browser/server push filters keep it panel-only. | Future push work could accidentally make it interrupting. | Keep `events:verify` and notification tests as the guardrail. |
 | Public cleaning complaints have record creation but audit mapping was not proven. | Public complaint handler writes complaint records; no explicit audit event was found in that flow. | Incident reconstruction may rely on complaint records without audit parity. | Owner-approved audit coverage review for public flows. |
 | Work tasks/meetings have snapshot notifications, not durable events. | `computeEvents()` derives reminders from state/time. | Reminders can differ from history/audit representation. | Event catalog should mark them as state-derived reminders. |
 

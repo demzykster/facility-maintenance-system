@@ -18,6 +18,7 @@ const NOTIF_KINDS = [
   { kind: "driver", label: "נהגים ושיבוצים" },
   { kind: "ppe", label: "ביגוד עובדים" },
   { kind: "cleaning", label: "ניקיון וסבבים" },
+  { kind: "waiting", label: "חזרה לטיפול" },
   { kind: "back", label: "סיום משמרת / החזרות" },
 ];
 

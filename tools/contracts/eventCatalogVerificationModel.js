@@ -39,7 +39,8 @@ const DEFAULT_RUNTIME_NOTIFICATION_KINDS = Object.freeze([
   "upd",
   "driver",
   "ppe",
-  "cleaning"
+  "cleaning",
+  "waiting"
 ]);
 
 const DEFAULT_RUNTIME_PUSH_KINDS = Object.freeze([

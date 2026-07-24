@@ -22,7 +22,7 @@ Status values:
 | Ticket create | Ticket record created with domain fields. | Ticket log/history may show creation. | Ticket write audit event. | `new` for visible roles. | Supported if access/prefs allow. | Ticket detail. | AI ticket create uses normal capability/API boundary. | Ticket API/authority tests. | `COVERED` with naming divergence. |
 | Supplier routing | Transport supplier queue derived from fleet/ticket supplier. | Field/status history if saved. | Ticket update audit. | Usually visible as `new` queue state. | Possible as `new`. | Ticket detail/list. | AI must use ticket API. | Transport visibility/authority tests. | `DUPLICATED_PATH`: routing is state, not explicit event. |
 | Supplier technician acceptance | Transport `new -> in_progress`. | Status/assignment history. | Status/ticket audit. | Snapshot state may produce update or remove queue item. | Possible, but no dedicated acceptance kind. | Ticket detail. | AI cannot bypass server authority. | Lifecycle authority tests. | `COVERED` with no dedicated event id. |
-| No-equipment waiting | Transport `new -> waiting` with `no_equipment`. | Waiting/status history. | Status/ticket audit. | `escalate` while waiting; later waiting-return helper emits `waiting`. | `waiting` is not a push kind; `escalate` can push. | Ticket detail. | AI cannot bypass. | Lifecycle authority tests. | `CURRENT_GAP`: `waiting` kind catalog mismatch. |
+| No-equipment waiting | Transport `new -> waiting` with `no_equipment`. | Waiting/status history. | Status/ticket audit. | `escalate` while waiting; later waiting-return helper emits panel-only `waiting`. | `waiting` is skipped by browser/server push; `escalate` can push. | Ticket detail. | AI cannot bypass. | Lifecycle authority and notification tests. | `COVERED`: `waiting` is registered panel-only. |
 | Repair complete | Technical execution done, pending approval. | Completion/status history. | Status/ticket audit. | Manager/admin approval notifications. | Possible by derived kind. | Ticket detail. | AI not execution authority. | Lifecycle authority tests. | `COVERED` with derived notification naming. |
 | Manager approval | Pending user/manager approval moves to admin close. | Approval history. | Status/ticket audit. | `ready` for admin. | Possible. | Ticket detail. | AI not approval authority. | Manager ownership tests. | `COVERED`. |
 | Rework | Returned for technician rework. | Rework/return history. | Status/ticket audit. | Tech `back` may be derived from log text. | Possible. | Ticket detail. | AI not rework authority. | Same-technician tests. | `DUPLICATED_PATH`: status plus log-text matching. |
@@ -44,7 +44,7 @@ Status values:
 | Gap | Operations affected | Risk | Proposed next action |
 |---|---|---|---|
 | No shared canonical event id across history/audit/notification/AI. | Most ticket, task, cleaning, PPE, fleet, install operations. | Hard to prove that all surfaces represent the same business action. | Owner-approved static Canonical Event Catalog. |
-| Waiting-return notification kind is not listed in the global notification catalog. | Waiting no-equipment and waitingUntil attention. | Preferences/push/docs can drift from produced event. | Add catalog decision before changing runtime kind behavior. |
+| Waiting-return notification kind must remain panel-only. | Waiting no-equipment and waitingUntil attention. | Future push changes could accidentally make it interrupting. | Keep catalog verification and notification push-exclusion tests. |
 | Some notification events are derived from text or snapshots. | Rework/back, PM due, task/meeting, PPE aggregate, driver result. | Refactors can accidentally break notifications without changing domain operations. | Add static route/kind guardrails and focused snapshot tests. |
 | Public cleaning complaint audit parity unknown. | Cleaning complaints from QR/public flow. | Incident/audit reconstruction may be incomplete. | Separate public-flow audit review; do not change public workflow in this sprint. |
 | Priority/SLA update semantics remain a known product decision. | Facility priority edit. | Changing priority can affect displayed SLA target by existing behavior. | Separate owner-approved SLA/priority goal. |
@@ -65,7 +65,7 @@ different identifiers or no identifier.
 
 - `computeEvents()` emits snapshot notification kinds.
 - Ticket API writes audit/history separately.
-- Waiting-return helper emits `waiting` outside the global notification kind set.
+- Waiting-return helper emits `waiting`, which is registered as panel-only.
 - Some rework/back notifications are derived from history text.
 - PPE/PM/task/meeting/driver notifications can be aggregate or state-derived.
 

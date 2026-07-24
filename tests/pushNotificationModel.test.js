@@ -86,6 +86,7 @@ describe("push notification model", () => {
     expect(pushEventInterruptsUser({ kind: "doc", dedupeKey: "doc-194336" })).toBe(false);
     expect(pushEventInterruptsUser({ kind: "pm", dedupeKey: "pm-1" })).toBe(false);
     expect(pushEventInterruptsUser({ kind: "ppe", dedupeKey: "ppe-low-admin" })).toBe(false);
+    expect(pushEventInterruptsUser({ kind: "waiting", dedupeKey: "wait-return-ticket-1-1000" })).toBe(false);
     expect(pushEventInterruptsUser({ kind: "confirm", dedupeKey: "sh-on-tech-1" })).toBe(false);
     expect(pushEventInterruptsUser({ kind: "back", tag: "sh-off-tech-1" })).toBe(false);
     expect(pushEventInterruptsUser({ kind: "new", dedupeKey: "ticket-1" })).toBe(true);
@@ -96,6 +97,18 @@ describe("push notification model", () => {
       kind: "doc",
       dedupeKey: "doc-194336"
     })).toMatchObject({ ok: true, interrupting: false });
+  });
+
+  it("normalizes waiting as panel-only and never serializes it into push payload kind", () => {
+    expect(normalizePushNotificationRequest({
+      title: "A",
+      body: "B",
+      targetUserIds: ["u1"],
+      kind: "waiting",
+      dedupeKey: "wait-return-ticket-1-1000"
+    })).toMatchObject({ ok: true, kind: "waiting", interrupting: false });
+
+    expect(JSON.parse(pushPayload({ title: "A", body: "B", kind: "waiting" })).kind).toBe("system");
   });
 
   it("selects only subscribed target users and de-dupes endpoints", () => {

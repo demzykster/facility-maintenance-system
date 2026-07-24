@@ -96,10 +96,12 @@ const PUSH_EVENT_KINDS = new Set([
   "system"
 ]);
 
+const PANEL_ONLY_PUSH_KINDS = new Set(["waiting"]);
 const NON_INTERRUPTING_PUSH_KINDS = new Set(["doc", "pm", "ppe"]);
 const NON_INTERRUPTING_PUSH_KEY_PREFIXES = ["sh-on-", "sh-off-"];
 
 export function pushEventInterruptsUser(input = {}) {
+  if (PANEL_ONLY_PUSH_KINDS.has(input.kind)) return false;
   const kind = PUSH_EVENT_KINDS.has(input.kind) ? input.kind : "system";
   if (NON_INTERRUPTING_PUSH_KINDS.has(kind)) return false;
   const key = String(input.dedupeKey || input.tag || input.key || "").trim();
@@ -114,7 +116,8 @@ export function normalizePushNotificationRequest(input = {}) {
   const body = String(input.body || "יש עדכון חדש במערכת").trim().slice(0, 180);
   const rawUrl = String(input.url || "/").trim();
   const url = rawUrl.startsWith("/") && !rawUrl.startsWith("//") ? rawUrl.slice(0, 220) : "/";
-  const kind = PUSH_EVENT_KINDS.has(input.kind) ? input.kind : "system";
+  const panelOnly = PANEL_ONLY_PUSH_KINDS.has(input.kind);
+  const kind = panelOnly ? String(input.kind) : (PUSH_EVENT_KINDS.has(input.kind) ? input.kind : "system");
   const tag = String(input.tag || input.dedupeKey || `cmms-${kind}`).trim().slice(0, 80);
   if (!targetUserIds.length) return { ok: false, error: "push_targets_required" };
   if (!title || !body) return { ok: false, error: "push_payload_required" };

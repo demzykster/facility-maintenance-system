@@ -54,7 +54,7 @@ documented in [Canonical Event Catalog](canonical-event-catalog.md).
 | Finding | Evidence | Classification | Next safe action |
 |---|---|---|---|
 | Same operation can appear under different names. | Ticket lifecycle history, audit actions, and notification kinds use different identifiers. | Current gap. | Create a static canonical event catalog before runtime changes. |
-| `waiting` notification kind is produced but not listed in global notification or push kind sets. | `waitingReturnReminderModel.js` emits `kind: "waiting"`; notification and push models omit it. | Current gap. | Document and add static guardrail; owner-approved runtime change later. |
+| `waiting` notification kind is produced and registered as panel-only. | `waitingReturnReminderModel.js` emits `kind: "waiting"`; notification model registers it; browser/server push filters skip it. | Owner-approved policy. | Keep catalog and notification tests aligned. |
 | Some notifications are snapshot reminders, not operation events. | `computeEvents()` derives task, meeting, PM, PPE, cleaning, SLA, and shift reminders from current state. | Intentional absence of durable event. | Catalog should explicitly mark state-derived reminders. |
 | Tech rework notifications depend partly on history text. | Tech branch searches log entries for return wording. | Duplicated/legacy path. | Keep as known compatibility behavior until event catalog exists. |
 | Public cleaning complaint audit parity is not proven. | Public complaint handler validation/write path found; explicit audit event not confirmed. | Unknown/current gap. | Owner-approved audit review of public flow. |

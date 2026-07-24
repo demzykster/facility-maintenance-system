@@ -12,6 +12,7 @@ describe("notification access model", () => {
     expect(notificationAllowedByAccess({ role: "worker", cleaningAccess: true }, "cleaning")).toBe(true);
     expect(notificationAllowedByAccess({ role: "worker" }, "cleaning")).toBe(false);
     expect(notificationAllowedByAccess({ role: "tech" }, "new")).toBe(true);
+    expect(notificationAllowedByAccess({ role: "tech" }, "waiting")).toBe(true);
     expect(notificationAllowedByAccess({ role: "user" }, "driver")).toBe(true);
   });
 
@@ -43,10 +44,12 @@ describe("notification access model", () => {
     });
 
     const ppe = rows.find((row) => row.kind === "ppe");
+    const waiting = rows.find((row) => row.kind === "waiting");
     const sla = rows.find((row) => row.kind === "sla");
     const task = rows.find((row) => row.kind === "task");
 
     expect(ppe).toMatchObject({ allowed: true, enabled: false, explicitlyDisabled: true });
+    expect(waiting).toMatchObject({ allowed: false, enabled: false, blockedReason: "אין גישה למודול המתאים" });
     expect(sla).toMatchObject({ allowed: false, enabled: false, blockedReason: "אין גישה למודול המתאים" });
     expect(task).toMatchObject({ allowed: true, enabled: true, explicitlyDisabled: false });
   });

@@ -31,22 +31,22 @@ describe("canonical event catalog verification", () => {
     }
   });
 
-  it("accepts the current catalog with waiting explicitly marked as a known gap", () => {
+  it("accepts the current catalog with waiting registered as panel-only", () => {
     const result = verifyCanonicalEventCatalog({ files: docs });
 
     expect(result.ok).toBe(true);
-    expect(result.knownGapNotificationKinds).toContain("waiting");
+    expect(result.knownGapNotificationKinds).toEqual([]);
     expect(result.catalogIds).toContain("ticket.no_equipment_waiting");
   });
 
   it("does not silently accept a notification kind outside runtime catalogs", () => {
     const catalog = CANONICAL_EVENT_CATALOG.map((entry) => entry.id === "ticket.no_equipment_waiting"
-      ? { ...entry, status: "complete" }
+      ? { ...entry, notificationKinds: ["waiting_missing"] }
       : entry);
 
     const result = verifyCanonicalEventCatalog({ catalog, files: docs });
 
-    expect(result.errors).toContain("notification_kind_not_modeled:ticket.no_equipment_waiting:waiting");
+    expect(result.errors).toContain("notification_kind_not_modeled:ticket.no_equipment_waiting:waiting_missing");
   });
 
   it("rejects unsupported routes unless the catalog classifies them", () => {

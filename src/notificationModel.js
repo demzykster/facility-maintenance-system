@@ -12,6 +12,7 @@ export const NOTIFICATION_KIND_IDS = [
   "driver",
   "ppe",
   "cleaning",
+  "waiting",
 ];
 
 export const DEFAULT_NOTIFY_CONFIG = NOTIFICATION_KIND_IDS.reduce(
